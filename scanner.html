@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<!--
+==================================================================================
+  LABEL SCANNER - box counting (iPhone / iPad, HTTPS-hosted)
+  APP VERSION: 1.2.0
+  Pairs with: Inventory Manager (APAC) v1.14.0+. CSV contract:
+  box_id, location, type, value, scanned_at, box_closed_at, special_storage,
+  disposal, brand, asset_tag, part_number, warranty, scanned_by   (extra columns: v1.1.0+)
+  Keep this changelog in sync: on every change, bump APP_VERSION (in the script
+  below) and add a line here. MAJOR.MINOR.PATCH.
+  ----------------------------------------------------------------------------------
+  CHANGELOG
+  v1.2.0 (2026-10-23) - Label core ported from the Tech Refresh scanner (validated on real
+                        HP and Lenovo labels). One classifier for both modes: HP serial 5CG
+                        and 5CD; Lenovo serial PF with S / (S)SN: prefix; combined Lenovo
+                        barcode 1S<MTM><serial> fills serial and part at once; 31P part;
+                        asset tag with H or L; Code 39 "/C" restored to "#" in part numbers;
+                        label text prefixes (SERIAL NUMBER:, ASSET TAG:, ]C1, *) stripped;
+                        warranty as 15-OCT-27, 2027-10-15, 10/2027 or 2027-10. Disposal: the
+                        serial names the manufacturer and switches the brand toggle by itself
+                        (the asset tag is company-wide, so it never does); a part number of
+                        another brand is ignored with a notice. Normal mode now counts 5CD and
+                        Lenovo serials too and shows the brand on the capture chip. Apple
+                        patterns unchanged (manual toggle). CSV contract unchanged.
+  v1.1.0 (2026-10-23) - Disposal boxes. Tick "Disposal box" when starting a box and each
+                        device is captured from its whole label as ONE record: serial,
+                        asset tag, part number and warranty date. Brand toggle on the
+                        camera (HP / Lenovo / Apple) picks the label patterns; HP needs all
+                        4 fields, Lenovo serial + asset + part (MTM), Apple serial + asset.
+                        The record saves itself when complete; "Save now" keeps a partial
+                        one (missing fields are reported in the Manager). Part # and
+                        warranty are only taken after the label's serial or asset tag was
+                        read, so codes from the label just saved never leak into the next
+                        device. Optional "Scanned by". Manual entry with all 4 fields. CSV
+                        gains disposal, brand, asset_tag, part_number, warranty, scanned_by
+                        (older Managers ignore the extra columns).
+  v1.0.1 (2026-10-23) - Cleanup: removed the unused "armed field" capture path (no
+                        button arms a field any more; box QR, ID|LOC: and LOC: labels
+                        are routed automatically). Version shown in the page footer.
+  v1.0.0 (2026-08-28) - Baseline for version tracking. Box workflow (ID|LOC: and LOC:
+                        QR routing), Serial / Asset mode overlay, sticky camera with
+                        count badge, manual add, forced uppercase, special-storage flag,
+                        per-box deterministic CSV names, multi-box "Send selected",
+                        camera restart after share sheet and on page return (iOS).
+==================================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Label Scanner — Box Counting</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#F6F7F9; --card:#FFFFFF; --ink:#1F2733; --muted:#5B6472;
+    --line:#E2E6EB; --accent:#2563EB;
+    --ok:#15803D; --ok-bg:#E8F5EC;
+    --warn:#B45309; --warn-bg:#FBF1E1;
+    --err:#B91C1C; --err-bg:#FBEAEA;
+    --mono:ui-monospace,'SF Mono',Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:16px;line-height:1.5}
+  .wrap{max-width:560px;margin:0 auto;padding:16px 16px 48px}
+
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  header h1{font-size:18px;font-weight:700}
+  .mode{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card)}
+  .mode button{border:0;background:transparent;padding:8px 14px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer}
+  .mode button.active{background:var(--accent);color:#fff}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+
+  /* box setup */
+  .boxsetup label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+  .fieldrow{display:flex;gap:8px}
+  .fieldrow input{flex:1;border:1px solid var(--line);border-radius:8px;padding:11px 12px;font-size:16px;font-family:var(--mono)}
+  .fieldrow input:focus{outline:2px solid var(--accent);border-color:var(--accent)}
+  .scanfield{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:0 14px;font-size:14px;font-weight:600;color:var(--accent);cursor:pointer;white-space:nowrap}
+  .boxsetup .btn{margin-top:14px;width:100%}
+
+  /* active box banner */
+  .activebox{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .activebox .info .bid{font-family:var(--mono);font-weight:700;font-size:17px}
+  .activebox .info .loc{color:var(--muted);font-size:13px}
+  .activebox .count{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent)}
+  .activebox .close{border:1px solid var(--line);background:transparent;border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600;color:var(--err);cursor:pointer}
+
+  .stage{position:sticky;top:0;z-index:10;background:#000;border-radius:12px;overflow:hidden;height:36vh;min-height:200px;max-height:320px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.18)}
+  #reader{width:100%;line-height:0}
+  #reader video{width:100% !important;height:auto !important;display:block}
+  .ovl-count{position:absolute;left:12px;top:12px;z-index:7;background:rgba(0,0,0,.62);color:#fff;font-family:var(--mono);font-weight:700;padding:6px 12px;border-radius:999px;display:none;align-items:center;gap:7px;font-size:14px;backdrop-filter:blur(2px)}
+  .ovl-count .n{font-size:17px;color:#7DD3FC}
+  .ovl-count.special::after{content:'★';color:#FBBF24}
+  .ovl-mode{position:absolute;right:12px;top:12px;z-index:8;display:flex;border-radius:999px;overflow:hidden;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+  .ovl-mode button{border:0;background:transparent;color:#fff;font-size:12px;font-weight:700;padding:6px 13px;cursor:pointer;font-family:var(--mono)}
+  .ovl-mode button.active{background:var(--accent);color:#fff}
+  .stage.flash{animation:flashok .5s ease}
+  @keyframes flashok{0%{box-shadow:inset 0 0 0 4px #22C55E}100%{box-shadow:inset 0 0 0 0 rgba(34,197,94,0)}}
+  .capchip{position:absolute;left:50%;bottom:54px;transform:translateX(-50%);background:rgba(21,128,61,.95);color:#fff;font-family:var(--mono);font-size:15px;font-weight:700;padding:8px 16px;border-radius:999px;z-index:8;display:none;white-space:nowrap;max-width:86%;overflow:hidden;text-overflow:ellipsis}
+  .capchip.show{display:block}
+  .capchip.warnc{background:rgba(180,83,9,.95)}
+  .aim{position:absolute;inset:0;pointer-events:none;z-index:4;display:flex;align-items:center;justify-content:center}
+  .aim .band{width:86%;border-top:2.5px dashed rgba(34,197,94,.95);position:relative}
+  .aim .band span{position:absolute;left:50%;transform:translate(-50%,-130%);background:rgba(0,0,0,.6);color:#fff;font-size:12px;padding:3px 12px;border-radius:999px;font-family:var(--mono);white-space:nowrap}
+  .statusbar{position:absolute;left:0;right:0;bottom:0;padding:10px 14px;font-family:var(--mono);font-size:13px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.7));min-height:44px;display:flex;align-items:flex-end;pointer-events:none;z-index:5}
+  .startbtn{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:6}
+  .startbtn button{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:14px 26px;font-size:16px;font-weight:600}
+
+  .result{margin-top:12px;display:none}
+  .result.show{display:block}
+  .result .value{font-family:var(--mono);font-size:24px;font-weight:700;letter-spacing:.04em;word-break:break-all}
+  .result .meta{color:var(--muted);font-size:13px;margin-top:4px}
+  .badge{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;margin-bottom:8px;background:var(--ok-bg);color:var(--ok)}
+  .actions{display:flex;gap:10px;margin-top:12px}
+  .btn{flex:1;border:0;border-radius:8px;padding:12px;font-size:15px;font-weight:600;cursor:pointer}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+
+  .list h2{font-size:14px;color:var(--muted);font-weight:600;margin:18px 0 8px;display:flex;justify-content:space-between;align-items:center}
+  .list h2 .linkbtn{border:0;background:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer}
+  .list ul{list-style:none}
+  .list li{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .list li .sn{font-family:var(--mono);font-weight:600;word-break:break-all}
+  .list li .time{color:var(--muted);font-size:12px;white-space:nowrap}
+  .list li .rm{border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}
+  .empty{color:var(--muted);font-size:14px;text-align:center;padding:14px;border:1px dashed var(--line);border-radius:8px}
+
+  /* closed boxes */
+  .boxitem{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px}
+  .boxitem.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .boxpick{display:flex;align-items:center;gap:9px;cursor:pointer}
+  .boxpick input{width:20px;height:20px;flex:none;accent-color:var(--accent)}
+  .boxitem .top{display:flex;justify-content:space-between;align-items:center}
+  .boxitem .bid{font-family:var(--mono);font-weight:700}
+  .boxitem .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .boxitem .rowbtns{display:flex;gap:8px;margin-top:10px}
+  .smallbtn{flex:1;border:1px solid var(--line);background:transparent;border-radius:8px;padding:9px;font-size:13.5px;font-weight:600;color:var(--ink);cursor:pointer}
+  .smallbtn.acc{color:var(--accent);border-color:var(--accent)}
+  .smallbtn.danger{color:var(--err)}
+
+  .recfields{list-style:none;margin:8px 0 2px}
+  .recfields li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .recfields li:last-child{border-bottom:0}
+  .recfields .fv{font-family:var(--mono);font-weight:700;word-break:break-all;text-align:right}
+  .recfields .pend{color:var(--muted);font-weight:500}
+  .recfields .opt{color:var(--muted);font-size:12px;font-weight:500}
+  .rechead{display:flex;justify-content:space-between;align-items:center}
+  .tagdisp{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--err-bg);color:var(--err);margin-left:6px;vertical-align:middle}
+  .list li .sub2{display:block;color:var(--muted);font-size:12px;font-family:var(--mono);font-weight:500}
+  .list li .sub2 .miss{color:var(--warn)}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap;z-index:20}
+  .toast.show{opacity:1}
+  .toast.warn{background:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage" id="stage">
+    <div id="reader"></div>
+    <div class="aim" id="aim"><div class="band"><span id="aimHint">align the SERIAL line here</span></div></div>
+    <div class="ovl-count" id="ovlCount"><span id="ovlId">BOX</span><span class="n" id="ovlN">0</span></div>
+    <div class="ovl-mode" id="ovlMode" role="tablist" aria-label="Target field">
+      <button id="modeSerial" class="active">Serial</button>
+      <button id="modeAsset">Asset</button>
+    </div>
+    <div class="ovl-mode" id="ovlBrand" role="tablist" aria-label="Label brand" style="display:none">
+      <button data-brand="HP" class="active">HP</button>
+      <button data-brand="LENOVO">Lenovo</button>
+      <button data-brand="APPLE">Apple</button>
+    </div>
+    <div class="capchip" id="capchip"></div>
+    <div class="startbtn" id="startbtn"><button id="btnStart">Tap to start camera</button></div>
+    <div class="statusbar" id="statusbar">starting camera…</div>
+  </div>
+
+  <!-- BOX SETUP (no active box) -->
+  <div class="card boxsetup" id="boxSetup">
+    <strong>Start a box</strong>
+    <label for="inBoxId">Box ID</label>
+    <div class="fieldrow">
+      <input id="inBoxId" placeholder="scan the box QR, or type e.g. BOX-0042" autocapitalize="characters" autocomplete="off">
+    </div>
+    <label for="inLoc">Location</label>
+    <div class="fieldrow">
+      <input id="inLoc" placeholder="e.g. CAB-01 / SHELF-3" autocapitalize="characters" autocomplete="off">
+    </div>
+    <label style="display:flex;align-items:center;gap:9px;margin-top:12px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer">
+      <input type="checkbox" id="inSpecial" style="width:18px;height:18px">
+      Special storage (assigned in ServiceNow — propose exemption)
+    </label>
+    <label style="display:flex;align-items:center;gap:9px;margin-top:8px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer">
+      <input type="checkbox" id="inDisposal" style="width:18px;height:18px">
+      Disposal box (capture the full label: serial, asset tag, part #, warranty)
+    </label>
+    <div id="opRow" style="display:none">
+      <label for="inOperator">Scanned by (optional)</label>
+      <div class="fieldrow"><input id="inOperator" placeholder="name or user ID" autocomplete="off"></div>
+    </div>
+    <button class="btn primary" id="btnStartBox">Start box</button>
+  </div>
+
+  <!-- ACTIVE BOX BANNER -->
+  <div class="card activebox" id="boxBanner" style="display:none">
+    <div class="info">
+      <div class="bid" id="bnId">BOX-0042</div>
+      <div class="loc" id="bnLoc">CAB-01</div>
+    </div>
+    <div class="count" id="bnCount">0</div>
+    <button class="close" id="btnSpecial" style="color:var(--accent)">Special: off</button>
+    <button class="close" id="btnCloseBox">Close box</button>
+  </div>
+
+  <div class="card" id="recCard" style="display:none">
+    <div class="rechead"><strong>Current label</strong><span class="badge" id="recBrand" style="margin:0">HP</span></div>
+    <ul class="recfields" id="recFields"></ul>
+    <div class="actions">
+      <button class="btn ghost" id="btnRecClear">Clear</button>
+      <button class="btn primary" id="btnRecSave">Save now</button>
+    </div>
+  </div>
+
+  <div class="card" id="manualCard" style="display:none">
+    <div id="manualStd">
+      <label style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">Add serial manually</label>
+      <div class="fieldrow">
+        <input id="inManual" placeholder="type or paste a serial" autocapitalize="characters" autocomplete="off">
+        <button class="scanfield" id="btnManualAdd" style="color:#fff;background:var(--accent);border-color:var(--accent)">Add</button>
+      </div>
+    </div>
+    <div id="manualDisp" style="display:none">
+      <label style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">Add a device manually (serial or asset tag required)</label>
+      <div class="fieldrow" style="margin-bottom:6px"><input id="inMSerial" placeholder="serial number"><input id="inMAsset" placeholder="asset tag"></div>
+      <div class="fieldrow"><input id="inMPart" placeholder="part number"><input id="inMWarranty" placeholder="warranty e.g. 15-OCT-27"></div>
+      <button class="btn primary" id="btnManualDisp" style="width:100%;margin-top:8px">Add device</button>
+    </div>
+  </div>
+
+  <div class="list">
+    <h2 id="curTitle">Current box</h2>
+    <ul id="scanList"></ul>
+    <div class="empty" id="emptyMsg">No scans yet.</div>
+
+    <h2>Closed boxes
+      <span>
+        <button class="linkbtn" id="btnSelAllBoxes">Select all</button>
+        <button class="linkbtn" id="btnSendSelected" disabled>Send selected (0)</button>
+      </span>
+    </h2>
+    <div id="boxesList"></div>
+    <div class="empty" id="noBoxesMsg">No closed boxes yet.</div>
+  </div>
+  <div id="appVersion" style="text-align:center;color:var(--muted);font-size:12px;font-family:var(--mono);margin-top:22px"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const APP_VERSION = '1.2.0';   // keep in sync with the CHANGELOG comment at the top of this file
+
+/* ---------- classification (shared by normal and disposal modes) ---------- */
+// Ported from the Tech Refresh scanner label core (validated on real HP and Lenovo labels):
+// one function reads any code off a label. Prefixes are stripped, Code 39 "/C" becomes "#",
+// and the serial tells the manufacturer. Apple has no reliable prefix: see APPLE_FALLBACK.
+const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function isWarranty(s){
+  let m = s.match(/^(\d{1,2})[- ]([A-Z]{3})[- ](\d{2}|\d{4})$/);                 // 15-OCT-27 (HP)
+  if (m) return MONTHS.includes(m[2]) && +m[1] >= 1 && +m[1] <= 31;
+  if (/^\d{4}[-\/.]\d{1,2}[-\/.]\d{1,2}$/.test(s)) return true;                 // 2027-10-15 (Lenovo)
+  return /^\d{1,2}\/\d{4}$/.test(s) || /^\d{4}-\d{2}$/.test(s);                 // 10/2027, 2027-10 (month precision)
+}
+const LENOVO_SERIAL = '(?:PF|PC|R9|MJ|MP)[A-Z0-9]{6,8}';   // PF validated on real labels; the other prefixes are provisional
+const RX_COMBINED = new RegExp('^(?:\\(1S\\)|1S)([A-Z0-9]{10})(' + LENOVO_SERIAL + ')$');   // Lenovo: MTM + serial in one barcode
+const RX_LENOVO_SN = new RegExp('^(?:\\(S\\)(?:SN:)?|S)?(' + LENOVO_SERIAL + ')$');
+function classifyLabel(raw){
+  let s = String(raw == null ? '' : raw).trim().toUpperCase().replace(/^\](?:C1|A0|C0)/, '').replace(/^\*|\*$/g, '');
+  s = s.replace(/^(?:ASSET TAG NUMBER|ASSET TAG|ASSET NO\.?|SERIAL NUMBER|SERIAL NO\.?|SERIAL|S\/N|SN|WARRANTY END DATE|WARRANTY|PART NUMBER|PART NO\.?|P\/N|PN|MTM)\s*:\s*/, '');
+  let m;
+  if ((m = s.match(RX_COMBINED)))  return {kind:'combined', serial:m[2], part:m[1], manufacturer:'LENOVO'};
+  if ((m = s.match(/^(?:\(31P\)|31P)([A-Z0-9]{10})$/))) return {kind:'part', value:m[1], manufacturer:'LENOVO'};
+  if ((m = s.match(RX_LENOVO_SN))) return {kind:'serial', value:m[1], manufacturer:'LENOVO'};
+  if (/^5C[DG][A-Z0-9]{7}$/.test(s)) return {kind:'serial', value:s, manufacturer:'HP'};
+  if (/^\d{2}[HL]\d{5}$/.test(s))    return {kind:'asset', value:s};            // company asset tag, all brands (H or L series)
+  if (isWarranty(s))                 return {kind:'warranty', value:s};
+  if (/^[A-Z0-9]{3,12}\/C[A-Z0-9]{2,4}$/.test(s)) s = s.replace('/C', '#');    // Code 39 Full ASCII encodes # as /C
+  if (/^[A-Z0-9]{3,12}#[A-Z0-9]{2,4}$/.test(s))   return {kind:'part', value:s, manufacturer:'HP'};       // e.g. 6N6J0EA#ABJ
+  if (/^(?=.*[A-Z])\d{2}[0-9A-Z]{8}$/.test(s))    return {kind:'part', value:s, manufacturer:'LENOVO'};   // MTM, e.g. 21WWS0EJ2W
+  return {kind:'unknown', value:s};
+}
+// normal (counting) mode: one field type per code
+function classify(v){
+  const c = classifyLabel(v);
+  return c.kind === 'combined' ? 'serial' : c.kind;
+}
+const LABELS = {serial:'Serial Number', asset:'Asset Tag', warranty:'Warranty date', part:'Part #', unknown:'Code'};
+
+/* ---------- disposal: one label = one record ---------- */
+// Apple labels carry no manufacturer prefix, so these shapes apply only with the Apple toggle
+// and only to codes the shared classifier does not claim. First versions: send real examples
+// if a field is not picked up and the pattern will be tightened.
+const APPLE_FALLBACK = {
+  serial:/^(?=.*[A-Z])(?=.*\d)[0-9A-Z]{10,12}$/,
+  part:/^[0-9A-Z]{4,7}\/[A-Z]$|^[0-9A-Z]{5}[A-Z]{1,2}\/A$/           // e.g. MXK32J/A
+};
+const DSP_REQUIRED = { HP:['serial','asset','part','warranty'], LENOVO:['serial','asset','part'], APPLE:['serial','asset'] };
+const DSP_FIELDS = ['serial','asset','part','warranty'];
+const DSP_LABEL = {serial:'Serial', asset:'Asset tag', part:'Part #', warranty:'Warranty'};
+const BRAND_LABEL = {HP:'HP', LENOVO:'Lenovo', APPLE:'Apple'};
+function classifyDisposal(text, bd){
+  const c = classifyLabel(text);
+  if (bd === 'APPLE'){
+    // a 10-char Apple serial can look like a Lenovo MTM: with the Apple toggle the serial wins
+    if ((c.kind === 'unknown' || (c.kind === 'part' && c.manufacturer === 'LENOVO')) && APPLE_FALLBACK.serial.test(c.value)) return {kind:'serial', value:c.value};
+    if (c.kind === 'unknown' && APPLE_FALLBACK.part.test(c.value)) return {kind:'part', value:c.value};
+  }
+  return c;
+}
+const emptyRec = () => ({serial:'', asset:'', part:'', warranty:''});
+const missingFields = (r, brand) => (DSP_REQUIRED[brand] || DSP_REQUIRED.HP).filter(f => !r[f]);
+
+/* ---------- persistent state ---------- */
+const KEY = 'inv-scanner-v1';
+let state = load();
+function load(){
+  try{ return JSON.parse(localStorage.getItem(KEY)) || {active:null, boxes:[]}; }
+  catch(e){ return {active:null, boxes:[]}; }
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+
+let target = 'serial';       // which barcode line we accept
+let brand = 'HP';            // disposal boxes: which label layout we read
+let rec = emptyRec();        // disposal boxes: the label being assembled
+const recentCodes = new Map();   // serial / asset tag of labels just saved -> time (ignored for a few seconds)
+const OP_KEY = 'inv-scanner-operator';
+let paused = false;
+let lastStatus = 0;
+let scanner = null;
+const selectedBoxes = new Set();   // keys "ID|closedAt" of closed boxes picked for multi-file send
+
+const $ = id => document.getElementById(id);
+
+/* ---------- mode toggle ---------- */
+$('modeSerial').onclick = () => setMode('serial');
+$('modeAsset').onclick  = () => setMode('asset');
+document.querySelectorAll('#ovlBrand button').forEach(btn => btn.onclick = () => setBrand(btn.dataset.brand));
+function setBrand(bd, auto){
+  if (bd === brand) return;
+  if (auto){
+    // the serial just read names another brand: keep the identity read so far, drop a part number that
+    // does not belong to the new brand
+    if (rec.part){ const pc = classifyDisposal(rec.part, bd); if (pc.kind !== 'part' || (pc.manufacturer && pc.manufacturer !== bd)) rec.part = ''; }
+  } else if (rec.serial || rec.asset || rec.part || rec.warranty) rec = emptyRec();   // a half-read label of another brand is dropped
+  brand = bd;
+  document.querySelectorAll('#ovlBrand button').forEach(x => x.classList.toggle('active', x.dataset.brand === bd));
+  render(); setStatus(defaultStatus());
+  toast(auto ? BRAND_LABEL[bd] + ' label detected: brand switched to ' + BRAND_LABEL[bd] : 'Label: ' + BRAND_LABEL[bd]);
+}
+function setMode(m){
+  target = m;
+  $('modeSerial').classList.toggle('active', m==='serial');
+  $('modeAsset').classList.toggle('active', m==='asset');
+  const ah = $('aimHint'); if (ah && state.active) ah.textContent = 'align the ' + (m === 'asset' ? 'ASSET TAG' : 'SERIAL') + ' line here';
+  if (state.active) setStatus(defaultStatus());
+  toast('Capturing: ' + LABELS[m]);
+}
+
+/* ---------- box lifecycle ---------- */
+try{ $('inOperator').value = localStorage.getItem(OP_KEY) || ''; }catch(e){}
+$('inDisposal').onchange = () => { $('opRow').style.display = $('inDisposal').checked ? 'block' : 'none'; };
+$('inOperator').addEventListener('input', () => { try{ localStorage.setItem(OP_KEY, $('inOperator').value.trim()); }catch(e){} });
+$('btnStartBox').onclick = () => {
+  const id = $('inBoxId').value.trim().toUpperCase();
+  if (!id) return toast('Enter or scan a Box ID first', true);
+  state.active = {
+    id,
+    location: $('inLoc').value.trim().toUpperCase(),
+    special: $('inSpecial').checked,
+    disposal: $('inDisposal').checked,
+    operator: $('inDisposal').checked ? $('inOperator').value.trim() : '',
+    startedAt: new Date().toISOString(),
+    scans: []
+  };
+  save(); render();
+  rec = emptyRec();
+  setStatus(defaultStatus());
+  toast('Box ' + id + ' started' + (state.active.special ? ' · special storage' : '') + (state.active.disposal ? ' · DISPOSAL' : ''));
+};
+
+$('btnCloseBox').onclick = () => {
+  const b = state.active;
+  if (!b) return;
+  const pending = rec.serial || rec.asset || rec.part || rec.warranty;
+  if (!confirm('Close box ' + b.id + ' with ' + b.scans.length + ' item(s)?' + (pending ? '\n\nThe label in progress is NOT saved and will be discarded.' : ''))) return;
+  rec = emptyRec();
+  b.closedAt = new Date().toISOString();
+  state.boxes.unshift(b);
+  state.active = null;
+  $('inBoxId').value = ''; $('inLoc').value = $('inLoc').value; // keep location for next box on same shelf
+  $('inSpecial').checked = false;                              // special never carries silently to the next box
+  $('inDisposal').checked = false; $('opRow').style.display = 'none';   // nor does disposal
+  save(); render();
+  resumeCameraSoon();                                          // the confirm() dialog froze the stream on iOS — bring it back for the next box
+  toast('Box closed');
+};
+
+$('btnSpecial').onclick = () => {
+  if (!state.active) return;
+  state.active.special = !state.active.special;
+  save(); render();
+  toast('Special storage ' + (state.active.special ? 'on' : 'off'));
+};
+
+/* ---------- manual serial entry ---------- */
+function addManual(){
+  if (!state.active) return toast('Start a box first', true);
+  let v = $('inManual').value.trim();
+  v = v.split('|LOC:')[0].replace(/^LOC:/i,'').trim();   // strip box-QR payload if pasted by mistake
+  if (!v) return;
+  const c = classifyLabel(v);                            // same path as a camera scan: normalised, dedup, cross-box warn
+  captureAsset(c.kind === 'combined' ? c.serial : c.value, classify(v), c.manufacturer);
+  $('inManual').value = '';
+  $('inManual').focus();
+}
+$('btnManualAdd').onclick = addManual;
+$('inManual').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); addManual(); } });
+
+function addManualDisposal(){
+  if (!state.active || !state.active.disposal) return;
+  const g = id => $(id).value.trim().toUpperCase();
+  const r = {serial:g('inMSerial'), asset:g('inMAsset'), part:g('inMPart'), warranty:g('inMWarranty')};
+  if (!r.serial && !r.asset) return toast('Type at least the serial or the asset tag', true);
+  const saved = rec; rec = r;
+  if (!commitRec()){ rec = saved; return; }
+  ['inMSerial','inMAsset','inMPart','inMWarranty'].forEach(id => $(id).value = '');
+  $('inMSerial').focus();
+}
+$('btnManualDisp').onclick = addManualDisposal;
+
+/* ---------- force UPPERCASE on code fields (iOS-safe) ---------- */
+function forceUpper(el){
+  if (!el) return;
+  el.style.textTransform = 'uppercase';        // visual while typing
+  el.setAttribute('autocapitalize','characters');
+  el.setAttribute('autocorrect','off');
+  el.setAttribute('spellcheck','false');
+  el.addEventListener('input', () => {          // force the actual value too (covers paste + iOS)
+    const s = el.selectionStart, e = el.selectionEnd, up = el.value.toUpperCase();
+    if (up !== el.value){ el.value = up; try{ el.setSelectionRange(s, e); }catch(_){} }
+  });
+}
+['inBoxId','inLoc','inManual','inMSerial','inMAsset','inMPart','inMWarranty'].forEach(id => forceUpper($(id)));
+
+/* ---------- scanner ---------- */
+let starting = false;
+function startScanner(){
+  if (starting) return;
+  if (typeof Html5Qrcode === 'undefined'){
+    setStatus('decoder failed to load — check network and reload');
+    return;
+  }
+  starting = true;
+  const formats = [
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.QR_CODE
+  ];
+  scanner = new Html5Qrcode('reader', {formatsToSupport: formats, verbose:false});
+  scanner.start(
+    {facingMode:'environment'},
+    {
+      fps: 10,
+      // wide band: fits the serial line comfortably; the pattern filter picks the right code
+      qrbox: (vw, vh) => ({ width: Math.min(vw * 0.92, 520), height: Math.min(vh * 0.7, 300) }),
+      videoConstraints: {facingMode:'environment', width:{ideal:1920}, height:{ideal:1080}, aspectRatio:{ideal:16/9}, focusMode:'continuous'}
+    },
+    onDecoded,
+    () => {}
+  ).then(() => {
+    starting = false;
+    setStatus(defaultStatus());
+    $('startbtn').style.display = 'none';
+  }).catch(() => {
+    starting = false;
+    setStatus('camera not started');
+    $('startbtn').style.display = 'flex';
+  });
+}
+// iOS suspends the camera stream while the share sheet / file dialog is open and does not
+// resume it — html5-qrcode still reports "scanning" over a frozen frame. So after an export
+// (or when the page comes back to the foreground) we tear the scanner down and start it fresh.
+async function restartScanner(){
+  if (starting) return;
+  try{
+    if (scanner){
+      const st = scanner.getState ? scanner.getState() : 0;
+      if (st === 2 || st === 3) await scanner.stop();   // 2=SCANNING, 3=PAUSED
+      if (scanner.clear) await scanner.clear();
+    }
+  }catch(e){}
+  scanner = null;
+  paused = false;
+  startScanner();
+}
+function resumeCameraSoon(){
+  setTimeout(restartScanner, 500);      // the camera is needed for setup (box QR) as well as counting
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') setTimeout(restartScanner, 300);
+});
+$('btnStart').onclick = startScanner;
+
+function defaultStatus(){
+  if (!state.active) return 'scan the box QR below, or type the Box ID';
+  if (state.active.disposal) return 'DISPOSAL · ' + BRAND_LABEL[brand] + ' label: fit the whole label in the frame';
+  return 'scanning for ' + LABELS[target].toUpperCase() + ' — fit the top 3 barcodes in the frame';
+}
+function setStatus(t){ $('statusbar').textContent = t; }
+
+function onDecoded(text){
+  if (paused) return;
+  text = text.trim();
+
+  // A combined box label "ID|LOC:PLACE" always fills BOTH fields, whatever the id or
+  // location looks like (multi-dash ids, locations with spaces/pipes, etc). This runs
+  // before the armed-field logic so a single scan never dumps the whole payload into Box ID.
+  const combo = text.match(/^([\s\S]*?)\|LOC:([\s\S]*)$/i);
+  if (combo && !state.active){
+    setBoxFields(combo[1].trim(), combo[2].trim());
+    return;
+  }
+
+  // auto-routing while setting up a box
+  if (!state.active){
+    if (/^LOC:/i.test(text)){
+      fillField('loc', text.replace(/^LOC:/i,'').trim());
+      return;
+    }
+    // a box label has a dash and isn't a serial / asset / warranty / part barcode
+    if (text.includes('-') && classify(text) === 'unknown'){
+      fillField('boxid', text);
+      return;
+    }
+  }
+
+  if (state.active && state.active.disposal){ handleDisposalCode(text); return; }
+
+  const c = classifyLabel(text);
+  const type = c.kind === 'combined' ? 'serial' : c.kind;
+  if (type !== target){
+    throttleStatus('ignoring ' + LABELS[type] + ' — looking for ' + LABELS[target]);
+    return;
+  }
+  if (!state.active){
+    throttleStatus('read OK, but start a box first ↑');
+    if (navigator.vibrate) navigator.vibrate([40,60,40]);
+    return;
+  }
+  captureAsset(c.kind === 'combined' ? c.serial : c.value, type, c.manufacturer);
+}
+
+function setBoxFields(id, loc){
+  $('inBoxId').value = String(id).toUpperCase();
+  $('inLoc').value = String(loc).toUpperCase();
+  if (navigator.vibrate) navigator.vibrate(80);
+  beep();
+  toast('Box + location set: ' + String(id).toUpperCase());
+  setStatus(defaultStatus());
+}
+function fillField(which, value){
+  if (which === 'boxid') value = value.split(/\|LOC:/i)[0];   // never keep the location payload in the Box ID
+  value = value.trim().toUpperCase();
+  if (which === 'boxid') $('inBoxId').value = value;
+  else $('inLoc').value = value;
+  if (navigator.vibrate) navigator.vibrate(80);
+  beep();
+  toast((which==='boxid'?'Box ID':'Location') + ' set: ' + value);
+  setStatus(defaultStatus());
+}
+
+function throttleStatus(msg){
+  const now = Date.now();
+  if (now - lastStatus > 1200){ lastStatus = now; setStatus(msg); }
+}
+
+let lastCaptured = {value:null, at:0};
+
+function captureAsset(value, type, maker){
+  const b = state.active;
+  value = value.toUpperCase();
+
+  // the code just captured stays in view for a moment — ignore it silently
+  if (lastCaptured.value === value && Date.now() - lastCaptured.at < 5000) return;
+
+  const dupHere = b.scans.some(s => s.value.toUpperCase() === value);
+  const dupOther = state.boxes.find(x => x.scans.some(s => s.value.toUpperCase() === value));
+  if (dupHere){
+    showChip('already counted: ' + value, true);
+    lastCaptured = {value, at: Date.now()};
+    return;
+  }
+
+  paused = true; // scanner keeps running (no ugly "paused" banner); we just skip decodes briefly
+  if (navigator.vibrate) navigator.vibrate(80);
+  beep();
+
+  const at = new Date();
+  b.scans.unshift({value, type, at: at.toISOString()});
+  save(); render();
+  lastCaptured = {value, at: Date.now()};
+
+  // a non-HP serial is counted like any other; the chip says which brand it is
+  const other = maker && maker !== 'HP' ? '  ·  ' + BRAND_LABEL[maker] + ' label' : '';
+  showChip('✓ ' + value + '  ·  #' + b.scans.length + other + (dupOther ? '  ⚠ also in ' + dupOther.id : ''), !!(dupOther || other));
+  const st = $('stage');
+  st.classList.remove('flash'); void st.offsetWidth; st.classList.add('flash');
+  setStatus('captured — keep going');
+
+  setTimeout(() => {
+    paused = false;
+    setStatus(defaultStatus());
+  }, 1400);
+}
+
+/* ---------- disposal capture ---------- */
+function codeInBox(b, v){ return b.scans.some(s => s.value === v || (s.asset_tag && s.asset_tag === v)); }
+function handleDisposalCode(text){
+  const c = classifyDisposal(text, brand);
+  if (c.kind === 'unknown'){ throttleStatus('ignoring ' + c.value.slice(0,18) + ' (not a ' + BRAND_LABEL[brand] + ' label field)'); return; }
+  const idv = c.kind === 'combined' ? c.serial : c.value;
+  const seen = recentCodes.get(idv);
+  if (seen && Date.now() - seen < 6000) return;            // the label just saved is still in view
+  // the serial names the manufacturer. A serial of another brand switches the toggle by itself;
+  // a part number of another brand is ignored (the asset tag is company-wide and says nothing)
+  if (c.manufacturer && c.manufacturer !== brand){
+    if (c.kind === 'part'){ throttleStatus('ignoring ' + c.value + ' (' + BRAND_LABEL[c.manufacturer] + ' part number, label set to ' + BRAND_LABEL[brand] + ')'); return; }
+    setBrand(c.manufacturer, true);
+  }
+  const fields = c.kind === 'combined' ? [['serial', c.serial], ['part', c.part]] : [[c.kind, c.value]];
+  const taken = [];
+  for (const [f, v] of fields){
+    if (rec[f] === v) continue;
+    // part # and warranty repeat across devices of the same model: only accept them once this
+    // label's serial or asset tag (unique) has been read, so they always belong to the right device
+    if ((f === 'part' || f === 'warranty') && !rec.serial && !rec.asset) break;
+    if (rec[f] && rec[f] !== v){
+      throttleStatus(DSP_LABEL[f] + ' already read for this label: tap Save now or Clear');
+      break;
+    }
+    if ((f === 'serial' || f === 'asset') && codeInBox(state.active, v)){
+      showChip('already counted: ' + v, true);
+      recentCodes.set(v, Date.now());
+      break;
+    }
+    rec[f] = v; taken.push(f);
+  }
+  if (!taken.length) return;
+  if (navigator.vibrate) navigator.vibrate(30);
+  beep(1600, .05);
+  renderRec();
+  const miss = missingFields(rec, brand);
+  if (!miss.length) commitRec();
+  else setStatus(taken.map(x => DSP_LABEL[x]).join(' + ') + ' ✓ · still need: ' + miss.map(x => DSP_LABEL[x]).join(', '));
+}
+function commitRec(){
+  const b = state.active;
+  if (!b) return false;
+  if (!rec.serial && !rec.asset){ toast('Read at least the serial or the asset tag', true); return false; }
+  const value = rec.serial || rec.asset;
+  if (codeInBox(b, value) || (rec.asset && codeInBox(b, rec.asset))){ showChip('already counted: ' + value, true); rec = emptyRec(); renderRec(); return false; }
+  const miss = missingFields(rec, brand);
+  const dupOther = state.boxes.find(x => codeInBox(x, value) || (rec.asset && codeInBox(x, rec.asset)));
+  b.scans.unshift({value, type: rec.serial ? 'serial' : 'asset', at: new Date().toISOString(), brand,
+                   asset_tag: rec.asset, part_number: rec.part, warranty: rec.warranty, missing: miss});
+  [rec.serial, rec.asset].filter(Boolean).forEach(c => recentCodes.set(c, Date.now()));
+  rec = emptyRec();
+  save(); render();
+  if (navigator.vibrate) navigator.vibrate(80);
+  beep();
+  showChip('✓ ' + value + '  ·  #' + b.scans.length + (miss.length ? '  ⚠ no ' + miss.map(x => DSP_LABEL[x]).join(', ') : '') + (dupOther ? '  ⚠ also in ' + dupOther.id : ''), !!(miss.length || dupOther));
+  const st = $('stage');
+  st.classList.remove('flash'); void st.offsetWidth; st.classList.add('flash');
+  setStatus('saved · next label');
+  return true;
+}
+function renderRec(){
+  const b = state.active;
+  const on = !!(b && b.disposal);
+  $('recCard').style.display = on ? 'block' : 'none';
+  if (!on) return;
+  $('recBrand').textContent = BRAND_LABEL[brand];
+  const req = DSP_REQUIRED[brand];
+  $('recFields').innerHTML = DSP_FIELDS.map(f =>
+    '<li><span>' + DSP_LABEL[f] + (req.includes(f) ? '' : ' <span class="opt">optional</span>') + '</span>' +
+    '<span class="fv' + (rec[f] ? '' : ' pend') + '">' + (rec[f] ? '✓ ' + rec[f] : 'waiting…') + '</span></li>').join('');
+  $('btnRecSave').disabled = !(rec.serial || rec.asset);
+}
+$('btnRecSave').onclick = () => commitRec();
+$('btnRecClear').onclick = () => { rec = emptyRec(); renderRec(); setStatus(defaultStatus()); };
+
+let chipTimer = null;
+function showChip(text, warn){
+  const c = $('capchip');
+  c.textContent = text;
+  c.classList.toggle('warnc', !!warn);
+  c.classList.add('show');
+  clearTimeout(chipTimer);
+  chipTimer = setTimeout(()=>c.classList.remove('show'), 2200);
+}
+
+/* ---------- render ---------- */
+function render(){
+  const b = state.active;
+  $('boxSetup').style.display = b ? 'none' : 'block';
+  $('boxBanner').style.display = b ? 'flex' : 'none';
+  $('manualCard').style.display = b ? 'block' : 'none';
+  const disp = !!(b && b.disposal);
+  $('manualStd').style.display = disp ? 'none' : 'block';
+  $('manualDisp').style.display = disp ? 'block' : 'none';
+  $('ovlMode').style.display = disp ? 'none' : 'flex';
+  $('ovlBrand').style.display = disp ? 'flex' : 'none';
+  const ovl = $('ovlCount');
+  if (b){
+    $('bnId').textContent = b.id;
+    $('bnLoc').innerHTML = esc(b.location || 'no location') + (b.disposal ? '<span class="tagdisp">DISPOSAL</span>' : '');
+    $('bnCount').textContent = b.scans.length;
+    $('curTitle').textContent = 'Current box — ' + b.id;
+    const sp = $('btnSpecial'); if (sp) sp.textContent = 'Special: ' + (b.special ? 'on' : 'off');
+    if (ovl){ ovl.style.display = 'flex'; ovl.classList.toggle('special', !!b.special); $('ovlId').textContent = b.id; $('ovlN').textContent = b.scans.length; }
+    const ah = $('aimHint'); if (ah) ah.textContent = b.disposal ? 'fit the whole ' + BRAND_LABEL[brand] + ' label here' : 'align the ' + (target === 'asset' ? 'ASSET TAG' : 'SERIAL') + ' line here';
+  } else {
+    $('curTitle').textContent = 'Current box';
+    if (ovl) ovl.style.display = 'none';
+    const ah = $('aimHint'); if (ah) ah.textContent = 'align the BOX QR here';
+  }
+
+  const scans = b ? b.scans : [];
+  $('emptyMsg').style.display = scans.length ? 'none' : 'block';
+  $('scanList').innerHTML = scans.map((s,i) =>
+    '<li><span class="sn">'+ esc(s.value) + dspSub(s) +'</span><span class="time">'+ new Date(s.at).toLocaleTimeString() +
+    '</span><button class="rm" data-i="'+i+'" aria-label="Remove">✕</button></li>'
+  ).join('');
+  document.querySelectorAll('#scanList .rm').forEach(btn => btn.onclick = () => {
+    state.active.scans.splice(+btn.dataset.i, 1);
+    save(); render();
+  });
+
+  $('noBoxesMsg').style.display = state.boxes.length ? 'none' : 'block';
+  $('boxesList').innerHTML = state.boxes.map((x,i) => {
+    const key = x.id + '|' + x.closedAt;
+    return '<div class="boxitem'+(selectedBoxes.has(key)?' sel':'')+'">'+
+      '<div class="top">'+
+        '<label class="boxpick"><input type="checkbox" class="boxsel" data-key="'+key.replace(/"/g,'&quot;')+'"'+(selectedBoxes.has(key)?' checked':'')+'><span class="bid">'+ esc(x.id) +'</span>'+(x.disposal?'<span class="tagdisp">DISPOSAL</span>':'')+'</label>'+
+        '<span class="sub">'+ x.scans.length +' item(s)</span>'+
+      '</div>'+
+      '<div class="sub">'+ (x.location || 'no location') + (x.special ? ' · special storage' : '') +' · closed '+ new Date(x.closedAt).toLocaleString() +'</div>'+
+      '<div class="rowbtns">'+
+        '<button class="smallbtn acc" data-exp="'+i+'">Export CSV</button>'+
+        '<button class="smallbtn" data-reopen="'+i+'">Reopen</button>'+
+        '<button class="smallbtn danger" data-del="'+i+'">Delete</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  document.querySelectorAll('.boxsel').forEach(cb => cb.onchange = () => {
+    const k = cb.dataset.key;
+    if (cb.checked) selectedBoxes.add(k); else selectedBoxes.delete(k);
+    syncBoxSel();
+  });
+  document.querySelectorAll('[data-exp]').forEach(btn => btn.onclick = () => exportCSV([state.boxes[+btn.dataset.exp]]));
+  document.querySelectorAll('[data-del]').forEach(btn => btn.onclick = () => {
+    const x = state.boxes[+btn.dataset.del];
+    if (confirm('Delete box ' + x.id + ' and its ' + x.scans.length + ' scan(s)? This cannot be undone.')){
+      state.boxes.splice(+btn.dataset.del, 1); save(); render();
+    }
+  });
+  document.querySelectorAll('[data-reopen]').forEach(btn => btn.onclick = () => {
+    if (state.active) return toast('Close the current box first', true);
+    const x = state.boxes.splice(+btn.dataset.reopen, 1)[0];
+    delete x.closedAt;
+    state.active = x; save(); render();
+    setStatus(defaultStatus());
+  });
+  syncBoxSel();
+  renderRec();
+}
+function esc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function dspSub(s){
+  if (!s.brand) return '';
+  const parts = [s.asset_tag && s.type !== 'asset' ? 'AT ' + s.asset_tag : '', s.part_number ? 'PN ' + s.part_number : '', s.warranty ? 'W ' + s.warranty : ''].filter(Boolean);
+  const miss = (s.missing || []).length ? '<span class="miss"> · no ' + s.missing.map(x => DSP_LABEL[x]).join(', ') + '</span>' : '';
+  return '<span class="sub2">' + BRAND_LABEL[s.brand] + (parts.length ? ' · ' + esc(parts.join(' · ')) : '') + miss + '</span>';
+}
+
+/* ---------- export ---------- */
+function selectedBoxObjects(){
+  const out = [];
+  for (const x of state.boxes){ if (selectedBoxes.has(x.id + '|' + x.closedAt)) out.push(x); }
+  return out;
+}
+function syncBoxSel(){
+  // prune keys for boxes that no longer exist
+  const live = new Set(state.boxes.map(x => x.id + '|' + x.closedAt));
+  for (const k of [...selectedBoxes]) if (!live.has(k)) selectedBoxes.delete(k);
+  const n = selectedBoxes.size, total = state.boxes.length;
+  const send = $('btnSendSelected');
+  if (send){ send.textContent = 'Send selected (' + n + ')'; send.disabled = n === 0; }
+  const all = $('btnSelAllBoxes');
+  if (all) all.textContent = (n && n === total) ? 'Clear all' : 'Select all';
+  document.querySelectorAll('.boxitem').forEach((el,i) => {
+    const x = state.boxes[i]; if (!x) return;
+    el.classList.toggle('sel', selectedBoxes.has(x.id + '|' + x.closedAt));
+  });
+}
+$('btnSelAllBoxes').onclick = () => {
+  const keys = state.boxes.map(x => x.id + '|' + x.closedAt);
+  const allSelected = keys.length && keys.every(k => selectedBoxes.has(k));
+  selectedBoxes.clear();
+  if (!allSelected) keys.forEach(k => selectedBoxes.add(k));
+  render();
+};
+$('btnSendSelected').onclick = () => {
+  const picked = selectedBoxObjects();
+  if (!picked.length) return toast('Select at least one box', true);
+  exportBoxesAsFiles(picked);
+};
+
+function csvEscape(v){ v = String(v==null?'':v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
+
+function csvForBoxes(boxes){
+  const rows = [['box_id','location','type','value','scanned_at','box_closed_at','special_storage','disposal','brand','asset_tag','part_number','warranty','scanned_by']];
+  for (const b of boxes)
+    for (const s of [...b.scans].reverse())
+      rows.push([b.id, b.location||'', s.type, s.value, s.at, b.closedAt||'', b.special?'true':'',
+                 b.disposal?'true':'', s.brand||'', s.asset_tag||'', s.part_number||'', s.warranty||'', b.disposal?(b.operator||''):'']);
+  return rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
+}
+function boxFileName(b){
+  const safe = s => String(s).replace(/[\\/:*?"<>|]+/g,'-').trim();
+  const month = String(b.closedAt || b.startedAt || new Date().toISOString()).slice(0,7);
+  return 'inventory-' + month + '-' + safe(b.id) + '.csv';   // deterministic: one box, one file
+}
+
+// single box (or a combined file when given several) — used by the per-box "Export CSV"
+async function exportCSV(boxes){
+  const csv = csvForBoxes(boxes);
+  const name = boxes.length === 1 ? boxFileName(boxes[0]) : 'inventory-' + new Date().toISOString().slice(0,7) + '-all.csv';
+  const file = new File([csv], name, {type:'text/csv'});
+  if (navigator.canShare && navigator.canShare({files:[file]})){
+    let done = false;
+    try{ await navigator.share({files:[file], title:name}); done = true; }
+    catch(e){ if (e.name === 'AbortError') done = true; }
+    resumeCameraSoon();
+    if (done) return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('CSV downloaded');
+}
+
+// several boxes as SEPARATE files, sent in one share action
+async function exportBoxesAsFiles(boxes){
+  boxes = boxes.filter(b => b && b.scans && b.scans.length);
+  if (!boxes.length) return toast('Nothing to export', true);
+  const files = boxes.map(b => new File([csvForBoxes([b])], boxFileName(b), {type:'text/csv'}));
+  if (navigator.canShare && navigator.canShare({files})){
+    let done = false;
+    try{ await navigator.share({files, title: files.length + ' inventory files'}); done = true; }
+    catch(e){ if (e.name === 'AbortError') done = true; }
+    resumeCameraSoon();
+    if (done){ selectedBoxes.clear(); render(); return; }
+  }
+  // fallback (desktop): download each file
+  for (const f of files){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(f); a.download = f.name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  selectedBoxes.clear(); render();
+  toast(files.length + ' file(s) exported');
+}
+
+/* ---------- misc ---------- */
+let audioCtx = null;
+function beep(freq, dur){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.frequency.value = freq || 1200; g.gain.value = .12;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + (dur || .12));
+  }catch(e){}
+}
+function toast(msg, warn){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.toggle('warn', !!warn);
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+render();
+$('appVersion').textContent = 'Label Scanner v' + APP_VERSION;
+window.addEventListener('load', startScanner);
+</script>
+</body>
+</html>
