@@ -2,7 +2,7 @@
 <!--
 ==================================================================================
   LABEL SCANNER - box counting (iPhone / iPad, HTTPS-hosted)
-  APP VERSION: 1.3.0
+  APP VERSION: 1.3.1
   Pairs with: Inventory Manager (APAC) v1.15.0+ (v1.14.x still reads the files). CSV contract:
   box_id, location, type, value, scanned_at, box_closed_at, special_storage,
   disposal, brand, asset_tag, part_number, warranty, scanned_by   (extra columns: v1.1.0+)
@@ -10,6 +10,13 @@
   below) and add a line here. MAJOR.MINOR.PATCH.
   ----------------------------------------------------------------------------------
   CHANGELOG
+  v1.3.1 (2026-11-25) - Disposal: serial AND asset tag are both mandatory. The pair is what
+                        is verified against ServiceNow later, so a record can no longer be
+                        saved with only one of them: "Save now" stays disabled until both
+                        are read (it still saves without part # / warranty), and manual
+                        entry asks for both. Manual entry also refuses a pair that looks
+                        swapped (asset tag typed in the serial field or the reverse).
+                        Records saved by earlier versions are untouched.
   v1.3.0 (2026-11-25) - Saving made explicit. Every closed box shows WHERE its CSV goes
                         (Data > Disposal > YYYY-MM for disposal boxes, Data > PhysicalCount >
                         YYYY-MM for count boxes) and whether it was already exported. Export
@@ -128,6 +135,7 @@
   .actions{display:flex;gap:10px;margin-top:12px}
   .btn{flex:1;border:0;border-radius:8px;padding:12px;font-size:15px;font-weight:600;cursor:pointer}
   .btn.primary{background:var(--accent);color:#fff}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
 
   .list h2{font-size:14px;color:var(--muted);font-weight:600;margin:18px 0 8px;display:flex;justify-content:space-between;align-items:center}
@@ -270,7 +278,7 @@
       </div>
     </div>
     <div id="manualDisp" style="display:none">
-      <label style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">Add a device manually (serial or asset tag required)</label>
+      <label style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">Add a device manually (serial and asset tag are both required)</label>
       <div class="fieldrow" style="margin-bottom:6px"><input id="inMSerial" placeholder="serial number"><input id="inMAsset" placeholder="asset tag"></div>
       <div class="fieldrow"><input id="inMPart" placeholder="part number"><input id="inMWarranty" placeholder="warranty e.g. 15-OCT-27"></div>
       <button class="btn primary" id="btnManualDisp" style="width:100%;margin-top:8px">Add device</button>
@@ -313,7 +321,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = '1.3.0';   // keep in sync with the CHANGELOG comment at the top of this file
+const APP_VERSION = '1.3.1';   // keep in sync with the CHANGELOG comment at the top of this file
 
 /* ---------- classification (shared by normal and disposal modes) ---------- */
 // Ported from the Tech Refresh scanner label core (validated on real HP and Lenovo labels):
@@ -485,7 +493,9 @@ function addManualDisposal(){
   if (!state.active || !state.active.disposal) return;
   const g = id => $(id).value.trim().toUpperCase();
   const r = {serial:g('inMSerial'), asset:g('inMAsset'), part:g('inMPart'), warranty:g('inMWarranty')};
-  if (!r.serial && !r.asset) return toast('Type at least the serial or the asset tag', true);
+  if (!r.serial || !r.asset) return toast('Type both the serial and the asset tag: the pair is checked later', true);
+  if (r.serial === r.asset || classifyLabel(r.serial).kind === 'asset' || ['serial','combined'].includes(classifyLabel(r.asset).kind))
+    return toast('Serial and asset tag look swapped or repeated: check the two fields', true);
   const saved = rec; rec = r;
   if (!commitRec()){ rec = saved; return; }
   ['inMSerial','inMAsset','inMPart','inMWarranty'].forEach(id => $(id).value = '');
@@ -721,7 +731,8 @@ function handleDisposalCode(text){
 function commitRec(){
   const b = state.active;
   if (!b) return false;
-  if (!rec.serial && !rec.asset){ toast('Read at least the serial or the asset tag', true); return false; }
+  // the serial + asset tag pair is what gets verified against ServiceNow later: never save half of it
+  if (!rec.serial || !rec.asset){ toast('Serial and asset tag are both required: ' + (rec.serial ? 'asset tag' : rec.asset ? 'serial' : 'both') + ' still missing', true); return false; }
   const value = rec.serial || rec.asset;
   if (codeInBox(b, value) || (rec.asset && codeInBox(b, rec.asset))){ showChip('already counted: ' + value, true); rec = emptyRec(); renderRec(); return false; }
   const miss = missingFields(rec, brand);
@@ -749,7 +760,9 @@ function renderRec(){
   $('recFields').innerHTML = DSP_FIELDS.map(f =>
     '<li><span>' + DSP_LABEL[f] + (req.includes(f) ? '' : ' <span class="opt">optional</span>') + '</span>' +
     '<span class="fv' + (rec[f] ? '' : ' pend') + '">' + (rec[f] ? '✓ ' + rec[f] : 'waiting…') + '</span></li>').join('');
-  $('btnRecSave').disabled = !(rec.serial || rec.asset);
+  const pair = !!(rec.serial && rec.asset);
+  $('btnRecSave').disabled = !pair;
+  $('btnRecSave').textContent = pair ? 'Save now' : 'Needs serial + asset tag';
 }
 $('btnRecSave').onclick = () => commitRec();
 $('btnRecClear').onclick = () => { rec = emptyRec(); renderRec(); setStatus(defaultStatus()); };

@@ -20,7 +20,7 @@ The Manager is meant to be downloaded and opened locally in Chrome or Edge (its 
 ## Versions
 
 - Inventory Manager **v1.15.0**
-- Label Scanner **v1.3.0**
+- Label Scanner **v1.3.1**
 
 Each file carries its own changelog in the comment at the top of the source.
 
@@ -33,7 +33,7 @@ Each file carries its own changelog in the comment at the top of the source.
 
 ### Disposal
 
-- On the scanner, tick **Disposal box** when starting a box. Pick the label brand on the camera (HP / Lenovo / Apple). Each device is saved as one record with serial, asset tag, part number and warranty.
+- On the scanner, tick **Disposal box** when starting a box. Pick the label brand on the camera (HP / Lenovo / Apple). Each device is saved as one record with serial, asset tag, part number and warranty. Serial and asset tag are both mandatory: the pair is what the Manager verifies against ServiceNow.
 - Save the CSVs of disposal boxes in `Data/Disposal/YYYY-MM/` (the scanner names them `disposal-YYYY-MM-BOX.csv`).
 - In the Manager, the **Disposal** tab is a 4-step guide: load the scanner files, add the ServiceNow data, review the flags, export. Reports are saved in `Data/Disposal/YYYY-MM/Reports/`. A printable handover sheet is optional.
 
