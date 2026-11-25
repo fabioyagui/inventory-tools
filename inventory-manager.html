@@ -2,13 +2,34 @@
 <!--
 ==================================================================================
   INVENTORY MANAGER — APAC platform (boxes, assets, reconciliation, chargeback)
-  APP VERSION: 1.14.1
+  APP VERSION: 1.15.0
   Keep this changelog in sync: on every change, bump APP_VERSION (in the script
   below) to match the newest entry here, and add a line describing what changed.
   Versioning: MAJOR.MINOR.PATCH — PATCH = fixes, MINOR = new features, MAJOR = big
   architectural shifts.
   ----------------------------------------------------------------------------------
   CHANGELOG
+  v1.15.0 (2026-11-25) - Files and folders made explicit, disposal first. ONE "Data folder" bar
+                        at the top of every tab replaces the two Connect buttons: it shows the
+                        state (not connected / access paused / connected, read only or can
+                        save) and says what Chrome will ask at each step. Selecting a subfolder
+                        (Disposal, 2026-11...) instead of Data is refused with an explanation.
+                        Folder map: per month, every subfolder with what goes in it, where the
+                        file comes from and whether it exists / is empty; "Create missing
+                        folders" builds them (needs the one-time "Allow saving" permission).
+                        Disposal tab is now a 4-step guide that works on its own: 1 scanner
+                        files (load the month from the Data folder, or choose several CSVs),
+                        2 ServiceNow data, 3 review, 4 export. Reports are saved straight into
+                        Data/Disposal/YYYY-MM/Reports/ (Downloads when the folder is not
+                        connected) and renamed disposal-report-YYYY-MM[-BOX] so they never
+                        collide with the scanner file of the same box. Import: several scanner
+                        CSVs can be chosen or dropped at once (one batch). Fixes: auto-load no
+                        longer stops at the first unreadable file (Excel lock files ~$ are
+                        skipped, a failing file is reported and the rest is read); scanner
+                        CSVs read from the folder keep every value exactly as scanned (no
+                        spreadsheet date / number conversion); CSV byte-order mark ignored;
+                        every export says where the file was saved; the Flags column of the
+                        Disposal table stays visible while the table scrolls sideways.
   v1.14.1 (2026-10-23) - Follows scanner v1.2.0 (Tech Refresh label core): brand guessed
                         from HP 5CD serials as well as 5CG and from Lenovo serials with the
                         S prefix; warranty dates with month precision (10/2027, 2027-10)
@@ -296,12 +317,45 @@
   .toast.show{opacity:1}
   .toast.warn{background:var(--warn)}
 
+  /* data folder bar (one connection for every tab) */
+  .dfbar{background:var(--card);border:1px solid var(--border);border-left:5px solid var(--muted);border-radius:12px;padding:11px 14px;margin-bottom:14px;box-shadow:var(--shadow);transition:box-shadow .2s}
+  .dfbar.ok{border-left-color:var(--ok)}
+  .dfbar.warn{border-left-color:var(--warn);background:var(--warn-bg)}
+  .dfbar.flash{box-shadow:0 0 0 3px var(--orange)}
+  .dfmain{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .dftext{flex:1;min-width:260px}
+  .dftitle{font-weight:700;font-size:14.5px}
+  .dfhint{color:var(--muted);font-size:12.5px;margin-top:1px}
+  .dfnote{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--err-bg);color:var(--err);font-size:13px;font-weight:600;display:none}
+  .dfmap{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+  .dfmap td{vertical-align:top;font-size:13px;padding:8px 12px}
+  .dfmap td.what{color:var(--ink)} .dfmap td.from{color:var(--muted)}
+  .dfmap tr.grp td{background:var(--surface2);font-weight:700;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:6px 12px}
+  .pathchip{font-family:var(--mono);font-size:12px;font-weight:500;background:var(--surface2);color:var(--ink);border-radius:6px;padding:1px 7px;white-space:nowrap}
+  /* guided steps (Disposal) */
+  .steps{list-style:none;margin-top:14px}
+  .step{display:flex;gap:12px;padding:13px 0;border-top:1px solid var(--border)}
+  .step:last-child{padding-bottom:2px}
+  .stepn{flex:none;width:28px;height:28px;border-radius:50%;background:var(--surface2);color:var(--muted);font-weight:700;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px}
+  .step.done .stepn{background:var(--ok);color:#fff}
+  .step.attn .stepn{background:var(--warn);color:#fff}
+  .stepbody{flex:1;min-width:0}
+  .steptitle{font-weight:700;font-size:15px}
+  .stepstatus{font-size:13.5px;margin:2px 0 6px}
+  .stephelp{color:var(--muted);font-size:12.5px;margin-bottom:8px;line-height:1.7}
+  .stepresult{font-size:13px;margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--surface2);display:none}
+  .stepresult.warn{background:var(--warn-bg);color:var(--warn)}
+  .stepresult ul{list-style:none} .stepresult li{padding:1px 0}
   #printArea{display:none}
   #printDisposal{display:none}
   .dspflag{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;margin:1px 3px 1px 0;white-space:nowrap}
   .dspflag.err{background:var(--err-bg);color:var(--err)} .dspflag.warn{background:var(--warn-bg);color:var(--warn)}
   .dspwrap{overflow-x:auto}
   .dspwrap td{white-space:nowrap}
+  /* Flags stay in view while the wide table scrolls sideways */
+  .dspwrap th:last-child,.dspwrap td:last-child{position:sticky;right:0}
+  .dspwrap td:last-child{background:var(--card);box-shadow:-10px 0 10px -10px rgba(18,33,58,.25);white-space:normal;min-width:170px}
+  .dspwrap tr.clickable:hover td:last-child{background:var(--accent-bg)}
   @media print{
     body > .wrap, .drawer, .overlay, .toast{display:none !important}
     #printArea{display:block}
@@ -336,7 +390,7 @@
 <div class="wrap">
   <header class="app">
     <div>
-      <h1>Inventory Manager <span id="appVersion" class="pill" style="font-size:12px;vertical-align:middle;background:var(--accent);color:#fff;-webkit-text-fill-color:#fff;-webkit-background-clip:border-box;background-clip:border-box">v1.14.1</span></h1>
+      <h1>Inventory Manager <span id="appVersion" class="pill" style="font-size:12px;vertical-align:middle;background:var(--accent);color:#fff;-webkit-text-fill-color:#fff;-webkit-background-clip:border-box;background-clip:border-box">v1.15.0</span></h1>
       <div class="sub">Monthly counts · Boxes · ServiceNow reconciliation — data lives in this browser</div>
     </div>
     <div class="tabs" role="tablist">
@@ -352,6 +406,37 @@
       <button data-tab="backup">Backup</button>
     </div>
   </header>
+
+  <!-- ================= DATA FOLDER (one connection, every tab) ================= -->
+  <div class="dfbar" id="dfBar">
+    <div class="dfmain">
+      <div class="dftext">
+        <div class="dftitle" id="dfTitle">Data folder</div>
+        <div class="dfhint" id="dfHint"></div>
+      </div>
+      <div class="row">
+        <button class="btn small" id="btnDfGrant" style="display:none">Grant access</button>
+        <button class="btn small" id="btnDfConnect">Connect Data folder</button>
+        <button class="btn small ghost" id="btnDfWrite" style="display:none">Allow saving</button>
+        <button class="btn small ghost" id="btnDfMap" style="display:none">Folder map</button>
+      </div>
+    </div>
+    <div class="dfnote" id="dfNote"></div>
+    <div class="dfmap" id="dfMap" style="display:none">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <div class="row">
+          <b>Folder map</b>
+          <label class="f">Month</label><select id="dfMapMonthSel"></select>
+          <button class="btn small ghost" id="btnDfRefresh">Refresh</button>
+        </div>
+        <div class="row">
+          <button class="btn small" id="btnDfCreate">Create missing folders</button>
+          <button class="btn small ghost" id="btnDfCreateCC">Create Cost Center folders</button>
+        </div>
+      </div>
+      <div id="dfMapWrap"></div>
+    </div>
+  </div>
 
   <!-- ================= MONTHS ================= -->
   <div class="panel active" id="panel-months">
@@ -449,10 +534,9 @@
   <div class="panel" id="panel-import">
     <div class="card">
       <h2>Auto-load from Data folder <span class="pill info" style="vertical-align:middle">by month</span></h2>
-      <p class="hint">Reads the month's files straight from a connected <b>Data</b> folder — physical counts from <code>Data/PhysicalCount/YYYY-MM/</code>, the ServiceNow export from <code>Data/ServiceNow/YYYY-MM/</code>, and the disposal export from <code>Data/Disposal/YYYY-MM/</code> (its serials are bucketed as Disposal in Reconcile). The physical count imports into that month; the others load ready for the Reconcile tab. Same connected folder as Cost Center.</p>
+      <p class="hint">Reads the month's files straight from a connected <b>Data</b> folder — physical counts from <code>Data/PhysicalCount/YYYY-MM/</code>, the ServiceNow export from <code>Data/ServiceNow/YYYY-MM/</code>, and the disposal export from <code>Data/Disposal/YYYY-MM/</code> (its serials are bucketed as Disposal in Reconcile). The physical count imports into that month; the others load ready for the Reconcile tab. Scanner CSVs of disposal boxes are read from <code>Data/Disposal/YYYY-MM/</code> as well.</p>
       <div class="row" style="justify-content:space-between">
         <div class="row">
-          <button class="btn" id="btnImpConnect">🔗 Connect Data folder</button>
           <span class="hint" id="impFolderStatus" style="margin:0"></span>
         </div>
         <div class="row">
@@ -466,9 +550,9 @@
 
     <div class="card">
       <h2>Import iPhone scans</h2>
-      <p class="hint">CSV exported by the phone scanner (box_id, location, type, value, scanned_at, box_closed_at). Items land in the <b>current month</b>; unknown boxes are auto-created in the registry.</p>
-      <div class="dropzone" id="dzPhone"><b>Choose a file</b> or drag the CSV here</div>
-      <input type="file" id="filePhone" accept=".csv,text/csv" hidden>
+      <p class="hint">CSVs exported by the phone scanner, one per box (<code>inventory-…csv</code> or <code>disposal-…csv</code>). Several files can be chosen at once. Items land in the <b>current month</b>; unknown boxes are auto-created in the registry.</p>
+      <div class="dropzone" id="dzPhone"><b>Choose files</b> or drag the scanner CSVs here</div>
+      <input type="file" id="filePhone" accept=".csv,text/csv" multiple hidden>
       <div class="summary" id="importSummary"></div>
     </div>
   </div>
@@ -535,20 +619,66 @@
   <!-- ================= DISPOSAL ================= -->
   <div class="panel" id="panel-disposal">
     <div class="card">
-      <h2>Disposal</h2>
-      <p class="hint">Devices in boxes flagged as <b>Disposal</b> (ticked on the phone scanner when the box is started, or with "Disposal box" in the box drawer). The scanner reads the whole label: serial, asset tag, part number and warranty. Model, CMDB warranty and ServiceNow status come from the export loaded in Reconcile or auto-loaded from <code>Data/ServiceNow/</code> and <code>Data/Disposal/</code>.</p>
-      <div class="row" style="justify-content:space-between">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div style="flex:1;min-width:260px">
+          <h2>Disposal</h2>
+          <p class="hint" style="margin:0">Four steps, top to bottom. Everything for this disposal lives in one folder: <span class="pathchip" id="dspHomePath">Data › Disposal › YYYY-MM</span></p>
+        </div>
         <div class="row">
           <label class="f">Month</label><select id="dspMonthSel"></select>
           <label class="f">Box</label><select id="dspBoxSel"></select>
         </div>
-        <div class="row">
-          <button class="btn ghost small" id="btnDspCsv">Export CSV</button>
-          <button class="btn small" id="btnDspExcel">Export Excel</button>
-          <button class="btn ghost small" id="btnDspPrint">Print handover sheet (optional)</button>
-        </div>
       </div>
-      <p class="hint" id="dspCmdbInfo" style="margin:10px 0 0"></p>
+      <ol class="steps">
+        <li class="step" id="dspStep1">
+          <span class="stepn">1</span>
+          <div class="stepbody">
+            <div class="steptitle">Bring in the scanner files</div>
+            <div class="stepstatus" id="dspS1"></div>
+            <div class="stephelp" id="dspS1help"></div>
+            <div class="row">
+              <button class="btn small" id="btnDspLoadFolder">Load from the Data folder</button>
+              <button class="btn small ghost" id="btnDspPickCsv">Choose CSV files…</button>
+              <input type="file" id="fileDspCsv" accept=".csv,text/csv" multiple hidden>
+            </div>
+            <div class="stepresult" id="dspLoadResult"></div>
+          </div>
+        </li>
+        <li class="step" id="dspStep2">
+          <span class="stepn">2</span>
+          <div class="stepbody">
+            <div class="steptitle">Add the ServiceNow data</div>
+            <div class="stepstatus" id="dspS2"></div>
+            <div class="stephelp" id="dspS2help"></div>
+            <div class="row">
+              <button class="btn small ghost" id="btnDspPickSn">Choose ServiceNow export…</button>
+              <input type="file" id="fileDspSn" accept=".csv,.xlsx,.xls" hidden>
+              <button class="btn small ghost" id="btnDspPickDp">Choose "Pending disposal" export…</button>
+              <input type="file" id="fileDspDp" accept=".csv,.xlsx,.xls" hidden>
+            </div>
+          </div>
+        </li>
+        <li class="step" id="dspStep3">
+          <span class="stepn">3</span>
+          <div class="stepbody">
+            <div class="steptitle">Review what needs attention</div>
+            <div class="stepstatus" id="dspS3"></div>
+            <div class="row"><button class="btn small ghost" id="btnDspShowFlags">Show only rows that need attention</button></div>
+          </div>
+        </li>
+        <li class="step" id="dspStep4">
+          <span class="stepn">4</span>
+          <div class="stepbody">
+            <div class="steptitle">Export the report</div>
+            <div class="stepstatus" id="dspS4"></div>
+            <div class="row">
+              <button class="btn small" id="btnDspExcel">Export Excel</button>
+              <button class="btn ghost small" id="btnDspCsv">Export CSV</button>
+              <button class="btn ghost small" id="btnDspPrint">Print handover sheet (optional)</button>
+            </div>
+          </div>
+        </li>
+      </ol>
     </div>
     <div class="stats" id="dspStats"></div>
     <div class="card">
@@ -663,7 +793,6 @@
       <p class="hint">Cross-check for finance: which cost center reimburses each delivered PC, valued by model. Feeds from a connected <b>Data</b> folder — weekly Task exports under <code>Data/Tasks/YYYY-MM/</code>, one current stockroom snapshot under <code>Data/Hardware/YYYY-MM/</code>, and the price list under <code>Data/Value/</code> (Excel, editable). Each request = one PC.</p>
       <div class="row" style="justify-content:space-between">
         <div class="row">
-          <button class="btn" id="btnCCConnect">🔗 Connect Data folder</button>
           <span class="hint" id="ccFolderStatus" style="margin:0"></span>
         </div>
         <div class="row">
@@ -807,7 +936,7 @@
 <div id="printDisposal"></div>
 <script>
 /* ================= state v2 ================= */
-const APP_VERSION = '1.14.1';   // keep in sync with the CHANGELOG comment at the top of this file
+const APP_VERSION = '1.15.0';   // keep in sync with the CHANGELOG comment at the top of this file
 const KEY = 'inv-manager-v1';
 (function(){ try{ const el=document.getElementById('appVersion'); if(el) el.textContent='v'+APP_VERSION; }catch(e){} })();
 let state = load();
@@ -1556,6 +1685,7 @@ $('btnClearSearch').onclick = () => { $('assetSearch').value=''; renderAssets();
 
 /* ================= file parsing (CSV + XLSX) ================= */
 function parseCSV(text){
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);   // byte-order mark would otherwise stick to the first header
   const rows = []; let row = [], cur = '', inQ = false;
   for (let i=0;i<text.length;i++){
     const c = text[i];
@@ -1615,7 +1745,57 @@ function readAny(file, handler){
 }
 
 /* ================= phone import ================= */
-hookDropzone($('dzPhone'), $('filePhone'), importPhone);
+function readAnyP(file){   // promise flavour of readAny, for batches
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error('could not read'));
+    if (/\.(xlsx|xls)$/i.test(file.name)){
+      r.onload = () => {
+        try{
+          const wb = XLSX.read(r.result, {type:'array'});
+          resolve(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:'', raw:false}));
+        }catch(e){ reject(new Error('not a readable Excel file')); }
+      };
+      r.readAsArrayBuffer(file);
+    } else {
+      r.onload = () => {
+        const rows = parseCSV(String(r.result));
+        if (rows.length < 2) return reject(new Error('no data rows'));
+        resolve(rowsToObjects(rows));
+      };
+      r.readAsText(file);
+    }
+  });
+}
+// several scanner CSVs (one per box) imported as ONE batch, so "newest count wins" works across the files
+async function importPhoneFiles(files, month){
+  const rows = [], skipped = []; let used = 0;
+  for (const f of files){
+    let objs;
+    try{ objs = await readAnyP(f); }catch(e){ skipped.push(f.name + ' (' + e.message + ')'); continue; }
+    const head = (objs[0] ? Object.keys(objs[0]) : []).map(x => x.trim().toLowerCase());
+    if (!(head.includes('box_id') && head.includes('value'))){ skipped.push(f.name + ' (not a scanner CSV)'); continue; }
+    for (const r of objs){ const o = {}; for (const k in r) o[k.trim().toLowerCase()] = r[k]; rows.push(o); }
+    used++;
+  }
+  let phone = null;
+  if (rows.length){
+    const allKeys = new Set(); rows.forEach(o => Object.keys(o).forEach(k => allKeys.add(k)));
+    rows.forEach(o => allKeys.forEach(k => { if (!(k in o)) o[k] = ''; }));   // older CSVs lack the newer columns
+    phone = importPhone(rows, month) || null;
+  }
+  if (skipped.length) toast(skipped.length + ' file(s) skipped: ' + skipped.join(', '), true, 6000);
+  return {used, skipped, phone};
+}
+(function(){
+  const dz = $('dzPhone'), fi = $('filePhone');
+  const go = files => { if (files.length) importPhoneFiles(files); };
+  dz.onclick = () => fi.click();
+  fi.onchange = () => { const files = [...fi.files]; fi.value = ''; go(files); };
+  dz.ondragover = e => { e.preventDefault(); dz.classList.add('drag'); };
+  dz.ondragleave = () => dz.classList.remove('drag');
+  dz.ondrop = e => { e.preventDefault(); dz.classList.remove('drag'); go([...e.dataTransfer.files]); };
+})();
 
 /* ---- Import: auto-load physical count + ServiceNow by month from the shared Data folder ---- */
 function impMonths(){
@@ -1631,80 +1811,77 @@ function impPopulateMonths(){
   sel.innerHTML = months.map(m=>'<option value="'+m+'">'+m+(m===state.current?' (current)':'')+'</option>').join('');
   sel.value = (keep && months.includes(keep)) ? keep : (state.current||months[0]||'');
 }
-async function impConnectFolder(){
-  if (!ccSupported()){ toast('Folder connect needs Chrome or Edge', true); return; }
-  try{
-    const h = await window.showDirectoryPicker({ id:'cc-data-folder', mode:'read' });
-    ccDirHandle = h;
-    try{ await ccIdbSet(CC_KEY, h); }catch(e){}
-    $('impFolderStatus').textContent = 'Connected: '+h.name;
-    const cf=$('ccFolderStatus'); if(cf) cf.textContent='Connected: '+h.name;   // keep Cost Center status in sync
-  }catch(err){ if(err.name!=='AbortError') toast('Could not connect: '+err.message, true); }
-}
-async function impRestoreFolder(){
-  if (!ccSupported()) return;
-  try{
-    const h = await ccIdbGet(CC_KEY); if(!h) return; ccDirHandle=h;
-    const perm = await h.queryPermission({mode:'read'});
-    $('impFolderStatus').textContent = perm==='granted' ? ('Connected: '+h.name) : ('Reconnect needed: '+h.name);
-  }catch(e){}
+// one table out of one file. Scanner CSVs are parsed as plain text so every value stays exactly as scanned
+// (a spreadsheet parser turns "15-OCT-27" into a date and long numeric codes into numbers).
+async function dfReadTable(file, name){
+  if (/\.csv$/i.test(name)){
+    const rows = parseCSV(await ccWithTimeout(file.text(), 15000, 'Reading '+name));
+    if (rows.length >= 2){
+      const head = rows[0].map(h => String(h).trim().toLowerCase());
+      if (head.includes('box_id') && head.includes('value')) return rowsToObjects(rows);
+    }
+  }
+  const buf = await ccWithTimeout(file.arrayBuffer(), 15000, 'Reading '+name);
+  const wb = XLSX.read(buf,{type:'array'});
+  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:'', raw:false});
 }
 async function impReadDir(sub, month){
-  const out=[]; let sawFolder=false, sawFiles=0;
+  const out=[], errors=[]; let sawFolder=false, sawFiles=0, subH;
+  try{ subH = await (await ccDirHandle.getDirectoryHandle(sub)).getDirectoryHandle(month); sawFolder=true; }
+  catch(e){ return {files:out, sawFolder, sawFiles, errors, error: e.name==='NotFoundError' ? '' : e.message}; }
   try{
-    const subH = await (await ccDirHandle.getDirectoryHandle(sub)).getDirectoryHandle(month);
-    sawFolder=true;
     for await (const [name, h] of subH.entries()){
-      if (h.kind!=='file' || !/\.(xlsx|xls|csv)$/i.test(name)) continue;
+      if (h.kind!=='file' || !/\.(xlsx|xls|csv)$/i.test(name) || /^~\$/.test(name)) continue;   // ~$ = lock file of a workbook open in Excel
       sawFiles++;
-      const file = await ccWithTimeout(h.getFile(), 15000, 'Reading '+name);
-      const buf = await ccWithTimeout(file.arrayBuffer(), 15000, 'Reading '+name);
-      const wb = XLSX.read(buf,{type:'array'});
-      const objs = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:'', raw:false});
-      out.push({name, objs});
+      try{
+        const file = await ccWithTimeout(h.getFile(), 15000, 'Reading '+name);
+        out.push({name, objs: await dfReadTable(file, name)});
+      }catch(e){ errors.push(name+': '+(e.message||e)); }      // one bad file never hides the others
     }
-  }catch(e){ return {files:out, sawFolder, sawFiles, error:e.message}; }
-  return {files:out, sawFolder, sawFiles};
+  }catch(e){ return {files:out, sawFolder, sawFiles, errors, error:e.message}; }
+  return {files:out, sawFolder, sawFiles, errors};
 }
 async function impAutoload(month){
-  if (!month){ toast('Pick a month first', true); return; }
-  if (!ccDirHandle){ toast('Connect the Data folder first', true); return; }
+  if (!month){ toast('Pick a month first', true); return null; }
+  if (!ccDirHandle){ toast('Connect the Data folder first: bar at the top of the page', true); dfFlash(); return null; }
   try{
-    if (await ccDirHandle.queryPermission({mode:'read'})!=='granted'){
-      if (await ccDirHandle.requestPermission({mode:'read'})!=='granted') return toast('Folder access not granted', true);
-    }
+    await dfEnsureRead();
     // physical count -> import into the selected month
     const pc = await impReadDir('PhysicalCount', month);
     const dp = await impReadDir('Disposal', month);
-    let pcImported=0;
-    const pcRows=[];
     const isScannerCsv = f => { const h=(f.objs[0]?Object.keys(f.objs[0]):[]).map(x=>x.trim().toLowerCase()); return h.includes('box_id') && h.includes('value'); };
-    for (const f of pc.files.concat(dp.files.filter(isScannerCsv))){   // scanner CSVs of disposal boxes may be saved in Disposal/ too
-      const head=(f.objs[0]?Object.keys(f.objs[0]):[]).map(x=>x.trim().toLowerCase());
-      if (!(head.includes('box_id') && head.includes('value'))) continue;
-      for (const r of f.objs){ const o={}; for (const k in r) o[k.trim().toLowerCase()]=r[k]; pcRows.push(o); }
-      pcImported++;
-    }
+    const pcRows=[]; let fromCount=0, fromDisposal=0;
+    const take = f => { for (const r of f.objs){ const o={}; for (const k in r) o[k.trim().toLowerCase()]=r[k]; pcRows.push(o); } };
+    for (const f of pc.files) if (isScannerCsv(f)){ take(f); fromCount++; }
+    for (const f of dp.files) if (isScannerCsv(f)){ take(f); fromDisposal++; }   // scanner CSVs of disposal boxes live in Disposal/
+    const pcImported = fromCount + fromDisposal;
+    let phone = null;
     if (pcRows.length){
       const allKeys=new Set(); pcRows.forEach(o=>Object.keys(o).forEach(k=>allKeys.add(k)));
       pcRows.forEach(o=>allKeys.forEach(k=>{ if(!(k in o)) o[k]=''; }));   // older CSVs may lack special_storage
-      importPhone(pcRows, month);                                         // one batch: global oldest-to-newest order, one summary
+      phone = importPhone(pcRows, month) || null;                         // one batch: global oldest-to-newest order, one summary
     }
     // ServiceNow -> load ready for reconcile
     const sn = await impReadDir('ServiceNow', month);
-    let snLoaded=false;
+    let snLoaded=false, snName='';
     const snFile = sn.files.find(f=>{ const h=(f.objs[0]?Object.keys(f.objs[0]):[]).map(x=>x.toLowerCase()); return h.some(x=>x.includes('serial')); });
-    if (snFile){ impLoadSnow(snFile.objs, snFile.name); snLoaded=true; }
+    if (snFile){ impLoadSnow(snFile.objs, snFile.name); snLoaded=true; snName=snFile.name; }
 
     // Disposal -> serials whose Substate is pending disposal, used to reclassify in Reconcile
-    let dpRows=0;
-    const dpFile = dp.files.find(f=>{ if (isScannerCsv(f)) return false; const h=(f.objs[0]?Object.keys(f.objs[0]):[]); return findCol(h,['serial.?number','serial.?num','^serial$','^sn$','serial']); });
-    if (dpFile){ dpRows = loadDisposalRecords(dpFile.objs, dpFile.name); }
+    let dpRows=0, dpName='';
+    const dpFile = dp.files.find(f=>{ if (isScannerCsv(f) || /^disposal-report/i.test(f.name)) return false; const h=(f.objs[0]?Object.keys(f.objs[0]):[]); return findCol(h,['serial.?number','serial.?num','^serial$','^sn$','serial']); });
+    if (dpFile){ dpRows = loadDisposalRecords(dpFile.objs, dpFile.name); dpName=dpFile.name; }
 
+    const res = {month, pc, dp, sn, pcImported, fromCount, fromDisposal, phone, snLoaded, snName, dpRows, dpName,
+                 errors: [].concat(pc.errors||[], dp.errors||[], sn.errors||[])};
     save(); renderAll(); impPopulateMonths(); $('impMonthSel').value=month;
-    impLoadSummaryRender(month, pc, pcImported, sn, snLoaded, dp, dpRows);
-    toast('Auto-loaded '+month+(pcImported?' — physical count imported':'')+(snLoaded?' + ServiceNow ready':'')+(dpRows?' + '+dpRows+' disposal':''), !pcImported && !snLoaded && !dpRows);
-  }catch(e){ toast('Auto-load failed: '+e.message, true); }
+    impLoadSummaryRender(res);
+    const nothing = !pcImported && !snLoaded && !dpRows;
+    toast(nothing ? 'Nothing found for '+month+': open the Folder map (bar at the top) to see what is missing'
+                  : 'Loaded '+month+(pcImported?': '+pcImported+' scanner file(s)':'')+(snLoaded?' + ServiceNow':'')+(dpRows?' + '+dpRows+' pending disposal':'')+(res.errors.length?' · '+res.errors.length+' file(s) could not be read':''),
+          nothing || !!res.errors.length, 4500);
+    return res;
+  }catch(e){ toast('Auto-load failed: '+e.message, true, 5000); return null; }
 }
 function impLoadSnow(objs, name){
   // mirror the dzSN hook so the Reconcile tab is ready
@@ -1770,20 +1947,24 @@ function renderDisposalFileStatus(){
     toast('Disposal file cleared');
   };
 }
-function impLoadSummaryRender(month, pc, pcImported, sn, snLoaded, dp, dpRows){
-  const s=$('impLoadSummary'); s.classList.add('show');
-  const li=(l,n)=>'<li><span>'+l+'</span><b class="mono">'+n+'</b></li>';
-  const pcLabel = pcImported ? (pcImported+' file(s) imported')
-    : (!pc.sawFolder ? 'no PhysicalCount/'+month+' folder' : (pc.sawFiles ? pc.sawFiles+' file(s), not a scanner CSV' : 'folder empty'));
-  const snLabel = snLoaded ? 'loaded — ready in Reconcile'
-    : (!sn.sawFolder ? 'no ServiceNow/'+month+' folder' : (sn.sawFiles ? sn.sawFiles+' file(s), no serial column' : 'folder empty'));
-  const dpLabel = dpRows ? (dpRows+' record(s) — will be bucketed as Disposal')
-    : (!dp || !dp.sawFolder ? 'no Disposal/'+month+' folder' : (dp.sawFiles ? dp.sawFiles+' file(s), no serial column' : 'folder empty'));
-  s.innerHTML='<ul>'+li('Month',month)+li('Physical count',pcLabel)+li('ServiceNow report',snLabel)+li('Disposal list',dpLabel)+'</ul>';
+function impFolderWhy(r, sub, month, miss){   // why a folder gave nothing, in plain words
+  if (!r || !r.sawFolder) return 'no '+sub+'/'+month+' folder';
+  return r.sawFiles ? r.sawFiles+' file(s), '+miss : 'folder empty';
 }
-$('btnImpConnect') && ($('btnImpConnect').onclick=impConnectFolder);
+function impLoadSummaryRender(res){
+  const s=$('impLoadSummary'); if (!s || !res) return; s.classList.add('show');
+  const li=(l,n)=>'<li><span>'+l+'</span><b class="mono">'+esc(n)+'</b></li>';
+  const pcLabel = res.pcImported
+    ? res.pcImported+' scanner file(s) imported'+(res.fromDisposal?' ('+res.fromDisposal+' from Disposal/)':'')
+    : impFolderWhy(res.pc, 'PhysicalCount', res.month, 'not a scanner CSV');
+  const snLabel = res.snLoaded ? res.snName+': ready in Reconcile' : impFolderWhy(res.sn, 'ServiceNow', res.month, 'no serial column');
+  const dpLabel = res.dpRows ? res.dpRows+' record(s) from '+res.dpName+': bucketed as Disposal'
+    : (res.fromDisposal ? 'no "Pending disposal" export in Disposal/'+res.month : impFolderWhy(res.dp, 'Disposal', res.month, 'no serial column'));
+  s.innerHTML='<ul>'+li('Month',res.month)+li('Physical count',pcLabel)+li('ServiceNow report',snLabel)+li('Disposal list',dpLabel)+
+    (res.errors.length ? '<li style="display:block;color:var(--err);font-size:12.5px">Could not read: '+res.errors.map(esc).join('<br>')+'</li>' : '')+'</ul>';
+}
 $('btnImpAutoload') && ($('btnImpAutoload').onclick=()=>impAutoload($('impMonthSel').value));
-impPopulateMonths();   // impRestoreFolder() runs at the end of the script, after CC_KEY is declared
+impPopulateMonths();   // the Data folder itself is restored at the end of the script (dfRestore), after CC_KEY is declared
 function ensureMonth(label){ if(!state.months[label]) state.months[label]={label, startedAt:new Date().toISOString(), counts:{}}; return state.months[label]; }
 function importPhone(objs, targetMonth){
   if (!objs.length) return toast('Empty file', true);
@@ -1903,6 +2084,8 @@ function importPhone(objs, targetMonth){
     '</ul>';
   function li(l,n){ return '<li><span>'+l+'</span><b class="mono">'+n+'</b></li>'; }
   toast('Import complete: '+added+' asset(s)'+(boxesReplaced?' · '+boxesReplaced+' box(es) replaced':''));
+  return {month, added, boxes: incoming.size, newBoxes, boxesReplaced, boxesSkippedOlder, moved, keptElsewhere, disposalBoxes,
+          disposalInFiles: [...incoming.values()].filter(g => g.disposal).length};
 }
 
 /* ================= reconciliation ================= */
@@ -2493,13 +2676,14 @@ $('btnRsExcel').onclick = async () => {
     const buf = await wb.xlsx.writeBuffer();
     downloadBlob(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
       'restock-'+month+'.xlsx');
-    toast('Excel exported for '+month);
+    toast('Saved to Downloads: restock-'+month+'.xlsx', false, 4500);
   }catch(e){ toast('Excel export failed: '+e.message, true); }
 };
-function downloadBlob(blob, name){
+function downloadBlob(blob, name, quiet){
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
+  if (!quiet) toast('Saved to the Downloads folder of this computer: '+name, false, 4500);
 }
 
 /* ================= headcount (joiners & leavers) ================= */
@@ -2713,7 +2897,7 @@ $('btnHcExcel').onclick = async () => {
     const buf = await wb.xlsx.writeBuffer();
     downloadBlob(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
       'headcount-'+new Date().toISOString().slice(0,10)+'.xlsx');
-    toast('Headcount Excel exported');
+    toast('Headcount Excel saved to the Downloads folder', false, 4500);
   }catch(e){ toast('Excel export failed: '+e.message, true); }
 };
 
@@ -2854,32 +3038,7 @@ async function ccIdbGet(k){ const db=await ccIdbOpen(); return new Promise((res,
 function ccSupported(){ return typeof window.showDirectoryPicker === 'function'; }
 function ccWithTimeout(p, ms, label){ return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error((label||'Operation')+' timed out — is the file fully downloaded (not "cloud only" in OneDrive)?')), ms))]); }
 
-async function ccConnectFolder(){
-  if (!ccSupported()){ toast('Folder connect needs Chrome or Edge', true); return; }
-  try{
-    const h = await window.showDirectoryPicker({ id:'cc-data-folder', mode:'read' });
-    ccDirHandle = h;                                  // session works even if persistence fails
-    { const st=$('impFolderStatus'); if(st) st.textContent='Connected: '+h.name; }   // keep Import status in sync
-    try{ await ccIdbSet(CC_KEY, h); }catch(e){ /* handle persistence is best-effort */ }
-    $('ccFolderStatus').textContent = 'Connected: '+h.name;
-    await ccPopulateMonths();
-  }catch(err){ if(err.name!=='AbortError') toast('Could not connect: '+err.message, true); }
-}
-async function ccRestoreFolder(){
-  if (!ccSupported()) return;
-  try{
-    const h = await ccIdbGet(CC_KEY); if(!h) return;
-    ccDirHandle = h;
-    const perm = await h.queryPermission({mode:'read'});
-    $('ccFolderStatus').textContent = perm==='granted' ? ('Connected: '+h.name) : ('Reconnect needed: '+h.name);
-    if (perm==='granted') await ccPopulateMonths();
-  }catch(e){/* handle gone; user reconnects */}
-}
-async function ccEnsurePerm(){
-  if (!ccDirHandle) throw new Error('Connect the Data folder first.');
-  if (await ccDirHandle.queryPermission({mode:'read'})==='granted') return;
-  if (await ccDirHandle.requestPermission({mode:'read'})!=='granted') throw new Error('Folder access not granted.');
-}
+async function ccEnsurePerm(){ return dfEnsureRead(); }   // the connection itself lives in the shared Data folder bar
 async function ccListMonthFolders(sub){
   try{
     const subH = await ccDirHandle.getDirectoryHandle(sub);
@@ -2978,7 +3137,7 @@ async function ccAutoloadMonth(month){
     }
     if (!taskFiles.length && !hw && !valApplied.applied) toast('No files found for '+month, true);
     else toast(msg, !hw);
-  }catch(e){ toast('Auto-load failed: '+e.message, true); }
+  }catch(e){ toast('Auto-load failed: '+e.message, true, 5000); if (!ccDirHandle) dfFlash(); }
 }
 // "file wins" — adopt prices from Value file, but warn before overwriting prices that differ from the dashboard
 function ccApplyValueFile(valRes){
@@ -3213,7 +3372,7 @@ $('btnCCValExport') && ($('btnCCValExport').onclick=async()=>{
     ws.views=[{state:'frozen',ySplit:hIdx}];
     const buf=await wb.xlsx.writeBuffer();
     downloadBlob(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), 'values.xlsx');
-    toast('Prices exported (values.xlsx) — put it in Data/Value/');
+    toast('values.xlsx saved to Downloads: move it into '+dfRootName()+' › Value', false, 6000);
   }catch(e){ toast('Export failed: '+e.message, true); }
 });
 $('btnCCValImport') && ($('btnCCValImport').onclick=()=>$('fileCCVal').click());
@@ -3271,7 +3430,7 @@ $('btnCCExcel') && ($('btnCCExcel').onclick=async()=>{
     ws.views=[{state:'frozen',ySplit:hIdx}];
     const buf=await wb.xlsx.writeBuffer();
     downloadBlob(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), 'chargeback-'+m+'.xlsx');
-    toast('Chargeback Excel exported for '+m);
+    toast('Saved to Downloads: chargeback-'+m+'.xlsx', false, 4500);
   }catch(e){ toast('Excel export failed: '+e.message, true); }
 });
 
@@ -3284,7 +3443,6 @@ document.querySelectorAll('#ccSubtabs .subtab').forEach(b=>b.onclick=()=>{
   $('cc-sub-stock').style.display = which==='stock'?'block':'none';
 });
 
-$('btnCCConnect') && ($('btnCCConnect').onclick=ccConnectFolder);
 $('btnCCAutoload') && ($('btnCCAutoload').onclick=()=>ccAutoloadMonth($('ccMonthSel').value));
 $('ccMonthSel') && ($('ccMonthSel').onchange=()=>renderCostCenter($('ccMonthSel').value));
 function ccInitCountry(){
@@ -3297,8 +3455,236 @@ function ccInitCountry(){
   sel.onchange=()=>{ CC().country=sel.value; save(); if(pill) pill.textContent=ccCountry().name; renderCostCenter(); };
 }
 ccInitCountry();
-ccRestoreFolder();
-impRestoreFolder();
+
+/* ================= data folder: ONE connection shared by every tab =================
+   ccDirHandle is the handle of the folder named Data. Reading needs the "view" permission,
+   creating month folders and saving reports needs the "edit" one (asked once, on demand). */
+const DF_KNOWN = ['PhysicalCount','ServiceNow','Disposal','Tasks','Hardware','Value','Values'];
+const DF_WRITE_KEY = KEY + '-dfwrite';      // saving was enabled before: "Grant access" then asks for it in one go
+let dfPerm = 'none';                        // none | prompt | read | readwrite
+let dfNote = '';                            // warning shown under the bar (wrong folder picked, ...)
+let dfMapOpen = false, dfMapMonth = null, dfMapToken = 0;
+const dfReady = () => dfPerm === 'read' || dfPerm === 'readwrite';
+const dfRootName = () => ccDirHandle ? ccDirHandle.name : 'Data';
+
+async function dfQuery(){
+  if (!ccDirHandle){ dfPerm = 'none'; return; }
+  try{
+    if (await ccDirHandle.queryPermission({mode:'readwrite'}) === 'granted') dfPerm = 'readwrite';
+    else if (await ccDirHandle.queryPermission({mode:'read'}) === 'granted') dfPerm = 'read';
+    else dfPerm = 'prompt';
+  }catch(e){ dfPerm = 'prompt'; }
+}
+function dfRender(){
+  const bar = $('dfBar'); if (!bar) return;
+  const sup = ccSupported(), name = dfRootName();
+  let cls = '', title, hint;
+  if (!sup){
+    title = 'Data folder: not available in this browser';
+    hint = 'Connecting a folder needs Chrome or Edge on a computer. Every tab still works with its "Choose file" buttons.';
+  } else if (!ccDirHandle){
+    title = 'Data folder: not connected';
+    hint = 'One connection serves every tab. Click <b>Connect Data folder</b>, select the folder named <b>Data</b> (the one that contains PhysicalCount, ServiceNow and Disposal), click <b>Select Folder</b>, then <b>View files</b> when Chrome asks.';
+  } else if (dfPerm === 'prompt'){
+    cls = 'warn';
+    title = 'Data folder: access paused · ' + name;
+    hint = 'Chrome pauses folder access every time this page is reopened. Click <b>Grant access</b>, then <b>Allow</b> (choose "Allow on every visit" to stop being asked). There is no need to select the folder again.';
+  } else {
+    cls = 'ok';
+    title = 'Data folder: connected · ' + name + (dfPerm === 'readwrite' ? ' · can read and save' : ' · read only');
+    hint = dfPerm === 'readwrite'
+      ? 'Files are read from this folder and disposal reports are saved into it. Open the <b>Folder map</b> to see what goes where.'
+      : 'Files are read from this folder. Click <b>Allow saving</b> once (Chrome asks "Save changes?") so month folders can be created and reports saved into it.';
+  }
+  bar.className = 'dfbar' + (cls ? ' ' + cls : '');
+  $('dfTitle').textContent = title;
+  $('dfHint').innerHTML = hint;
+  const note = $('dfNote'); note.style.display = dfNote ? 'block' : 'none'; note.textContent = dfNote;
+  const show = (id, on) => { $(id).style.display = on ? '' : 'none'; };
+  show('btnDfConnect', sup);
+  $('btnDfConnect').textContent = ccDirHandle ? 'Change folder' : 'Connect Data folder';
+  $('btnDfConnect').classList.toggle('ghost', !!ccDirHandle);
+  show('btnDfGrant', sup && !!ccDirHandle && dfPerm === 'prompt');
+  show('btnDfWrite', dfPerm === 'read');
+  show('btnDfMap', dfReady());
+  $('btnDfMap').textContent = dfMapOpen ? 'Hide folder map' : 'Folder map';
+  $('dfMap').style.display = (dfMapOpen && dfReady()) ? 'block' : 'none';
+  const mirror = !sup ? '' : dfReady() ? 'Data folder: connected (' + name + ')'
+    : ccDirHandle ? 'Data folder: access paused. Click "Grant access" in the bar at the top of the page.'
+    : 'Data folder: not connected. Use the bar at the top of the page.';
+  ['impFolderStatus','ccFolderStatus'].forEach(id => { const el = $(id); if (el) el.textContent = mirror; });
+  if (dfMapOpen && dfReady()) dfRenderMap();
+  if ($('panel-disposal') && $('panel-disposal').classList.contains('active')) renderDisposal();
+}
+function dfFlash(){
+  const bar = $('dfBar'); if (!bar) return;
+  try{ bar.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
+  bar.classList.add('flash'); setTimeout(() => bar.classList.remove('flash'), 1600);
+}
+async function dfKnownIn(h){
+  const found = [];
+  try{ for await (const [name, e] of h.entries()){ if (e.kind === 'directory' && DF_KNOWN.some(k => k.toLowerCase() === name.toLowerCase())) found.push(name); } }catch(e){}
+  return found;
+}
+const dfLooksInner = name => /^\d{4}-\d{2}$/.test(name) || /^reports$/i.test(name) || DF_KNOWN.some(k => k.toLowerCase() === String(name).toLowerCase());
+async function dfConnect(){
+  if (!ccSupported()) return toast('Folder connect needs Chrome or Edge on a computer', true);
+  let h;
+  try{
+    const opts = {id:'cc-data-folder', mode:'read'};
+    if (ccDirHandle) opts.startIn = ccDirHandle;                 // reopen the picker where the folder was last time
+    try{ h = await window.showDirectoryPicker(opts); }
+    catch(err){ if (err.name === 'AbortError' || !opts.startIn) throw err; h = await window.showDirectoryPicker({id:'cc-data-folder', mode:'read'}); }
+  }catch(err){ if (err.name !== 'AbortError') toast('Could not connect: ' + err.message, true, 5000); return; }
+  const found = await dfKnownIn(h);
+  if (!found.length && dfLooksInner(h.name)){
+    // a subfolder was picked: keep the previous connection, explain, let the user choose again
+    dfNote = 'You selected "' + h.name + '", which is a folder INSIDE the Data folder. Click the button again and select the Data folder itself: the one that contains PhysicalCount, ServiceNow and Disposal.';
+    dfRender(); dfFlash();
+    return toast('"' + h.name + '" is a subfolder, not the Data folder', true, 5000);
+  }
+  ccDirHandle = h;
+  try{ await ccIdbSet(CC_KEY, h); }catch(e){ /* remembering the handle is best-effort */ }
+  dfNote = found.length ? '' : '"' + h.name + '" has none of the expected folders yet (PhysicalCount, ServiceNow, Disposal). If this is the right place, click "Create missing folders" below; otherwise click "Change folder".';
+  await dfQuery();
+  if (!found.length) dfMapOpen = true;
+  dfRender();
+  try{ await ccPopulateMonths(); }catch(e){}
+  toast('Data folder connected: ' + h.name);
+}
+async function dfGrant(){
+  if (!ccDirHandle) return dfConnect();
+  let wantWrite = false; try{ wantWrite = localStorage.getItem(DF_WRITE_KEY) === '1'; }catch(e){}
+  try{
+    let r = await ccDirHandle.requestPermission({mode: wantWrite ? 'readwrite' : 'read'});
+    if (r !== 'granted' && wantWrite) r = await ccDirHandle.requestPermission({mode:'read'});
+  }catch(e){ toast('Chrome could not reopen the folder (' + e.message + '). Click "Change folder" and select it again.', true, 6000); }
+  await dfQuery(); dfRender();
+  if (dfReady()){ toast('Access granted: ' + ccDirHandle.name); try{ await ccPopulateMonths(); }catch(e){} }
+}
+async function dfEnsureRead(){
+  if (!ccDirHandle) throw new Error('Connect the Data folder first (bar at the top of the page).');
+  if (await ccDirHandle.queryPermission({mode:'read'}) === 'granted') return;
+  const r = await ccDirHandle.requestPermission({mode:'read'});
+  await dfQuery(); dfRender();
+  if (r !== 'granted') throw new Error('Folder access not granted.');
+}
+// true when files can be written into the Data folder (asks Chrome once: "Save changes?")
+async function dfTryWrite(){
+  if (!ccDirHandle) return false;
+  try{
+    if (await ccDirHandle.queryPermission({mode:'readwrite'}) !== 'granted'){
+      const r = await ccDirHandle.requestPermission({mode:'readwrite'});
+      await dfQuery(); dfRender();
+      if (r !== 'granted') return false;
+    }
+    try{ localStorage.setItem(DF_WRITE_KEY, '1'); }catch(e){}
+    if (dfPerm !== 'readwrite'){ dfPerm = 'readwrite'; dfRender(); }
+    return true;
+  }catch(e){ return false; }
+}
+async function dfMakeDir(parts){
+  let dir = ccDirHandle;
+  for (const p of parts) dir = await dir.getDirectoryHandle(p, {create:true});
+  return dir;
+}
+async function dfSaveFile(parts, name, blob){
+  const dir = await dfMakeDir(parts);
+  const fh = await dir.getFileHandle(name, {create:true});
+  const w = await fh.createWritable();
+  await w.write(blob); await w.close();
+}
+
+/* ---- folder map: what goes where, and what is there right now ---- */
+function dfMapDefs(m){
+  return [
+    {key:'main', grp:'Counting and disposal', rows:[
+      {p:['Disposal', m], what:'Scanner CSVs of <b>disposal</b> boxes (<code>disposal-'+m+'-BOX.csv</code>) and the ServiceNow "Pending disposal" export', from:'iPhone scanner: Export CSV, then Save to Files. ServiceNow: list export.'},
+      {p:['Disposal', m, 'Reports'], what:'Disposal reports written by this page (Excel / CSV)', from:'Disposal tab, step 4. Nothing to copy here by hand.'},
+      {p:['PhysicalCount', m], what:'Scanner CSVs of normal count boxes (<code>inventory-'+m+'-BOX.csv</code>)', from:'iPhone scanner: Export CSV, then Save to Files.'},
+      {p:['ServiceNow', m], what:'Main hardware export, e.g. <code>alm_hardware.xlsx</code>', from:'ServiceNow: export of the hardware list.'}
+    ]},
+    {key:'cc', grp:'Cost Center', rows:[
+      {p:['Tasks', m], what:'Weekly Task exports (W1 to W5 in the file name)', from:'ServiceNow.'},
+      {p:['Hardware', m], what:'One stockroom snapshot for the month', from:'ServiceNow.'},
+      {p:['Value'], alt:['Values'], what:'Price list <code>values.xlsx</code> (not per month)', from:'Cost Center tab: Export prices.'}
+    ]}
+  ];
+}
+async function dfInspect(parts){
+  let dir = ccDirHandle;
+  try{ for (const p of parts) dir = await dir.getDirectoryHandle(p); }
+  catch(e){ return {exists:false, err: e.name === 'NotFoundError' ? '' : (e.message || String(e))}; }
+  let files = 0;
+  try{ for await (const [n, h] of dir.entries()){ if (h.kind === 'file' && !/^(~\$|\.)/.test(n)) files++; } }
+  catch(e){ return {exists:true, files:0, err:e.message || String(e)}; }
+  return {exists:true, files};
+}
+async function dfInspectRow(r){
+  let st = await dfInspect(r.p);
+  if (!st.exists && r.alt){ const alt = await dfInspect(r.alt); if (alt.exists) return Object.assign(alt, {p:r.alt}); }
+  return Object.assign(st, {p:r.p});
+}
+async function dfRenderMap(){
+  const wrap = $('dfMapWrap'), sel = $('dfMapMonthSel'); if (!wrap || !dfReady()) return;
+  const months = impMonths();
+  if (!dfMapMonth || !months.includes(dfMapMonth)) dfMapMonth = state.current;
+  sel.innerHTML = months.map(m => '<option value="'+m+'">'+m+(m===state.current?' (current)':'')+'</option>').join('');
+  sel.value = dfMapMonth;
+  const token = ++dfMapToken, m = dfMapMonth, root = dfRootName();
+  let h = '<table><thead><tr><th>Folder</th><th>What goes in it</th><th>Where the file comes from</th><th>Now</th></tr></thead><tbody>';
+  let missMain = 0, missCC = 0;
+  for (const g of dfMapDefs(m)){
+    h += '<tr class="grp"><td colspan="4">'+g.grp+'</td></tr>';
+    for (const r of g.rows){
+      const st = await dfInspectRow(r);
+      if (token !== dfMapToken) return;                       // a newer render started meanwhile
+      if (!st.exists){ if (g.key === 'main') missMain++; else missCC++; }
+      const pill = st.err ? '<span class="pill err" title="'+esc(st.err)+'">cannot read</span>'
+        : !st.exists ? '<span class="pill err">missing</span>'
+        : st.files ? '<span class="pill ok">'+st.files+' file'+(st.files>1?'s':'')+'</span>'
+        : '<span class="pill gray">empty</span>';
+      h += '<tr><td class="mono" style="white-space:nowrap">'+esc(root)+' › '+st.p.map(esc).join(' › ')+'</td><td class="what">'+r.what+'</td><td class="from">'+r.from+'</td><td>'+pill+'</td></tr>';
+    }
+  }
+  wrap.innerHTML = h + '</tbody></table>';
+  $('btnDfCreate').style.display = missMain ? '' : 'none';
+  $('btnDfCreate').textContent = 'Create missing folders for ' + m;
+  $('btnDfCreateCC').style.display = missCC ? '' : 'none';
+}
+async function dfCreateFolders(key){
+  if (!ccDirHandle) return;
+  if (!(await dfTryWrite())) return toast('Saving was not allowed: Chrome needs "Save changes" to create folders', true, 5000);
+  const m = dfMapMonth || state.current; let made = 0;
+  try{
+    for (const g of dfMapDefs(m)){
+      if (g.key !== key) continue;
+      for (const r of g.rows){ const st = await dfInspectRow(r); if (!st.exists){ await dfMakeDir(r.p); made++; } }
+    }
+    dfNote = '';
+    toast(made ? made + ' folder(s) created for ' + m : 'All folders already exist for ' + m);
+  }catch(e){ toast('Could not create folders: ' + e.message, true, 5000); }
+  dfRender();
+  try{ await ccPopulateMonths(); }catch(e){}
+}
+async function dfRestore(){
+  if (ccSupported()){
+    try{ const h = await ccIdbGet(CC_KEY); if (h) ccDirHandle = h; }catch(e){ /* nothing remembered */ }
+    await dfQuery();
+  }
+  dfRender();
+  if (dfReady()){ try{ await ccPopulateMonths(); }catch(e){} }
+}
+$('btnDfConnect').onclick = dfConnect;
+$('btnDfGrant').onclick = dfGrant;
+$('btnDfWrite').onclick = async () => { toast((await dfTryWrite()) ? 'Saving allowed: reports and folders go into ' + dfRootName() : 'Saving was not allowed', !(dfPerm === 'readwrite')); };
+$('btnDfMap').onclick = () => { dfMapOpen = !dfMapOpen; dfRender(); };
+$('btnDfRefresh').onclick = () => dfRenderMap();
+$('dfMapMonthSel').onchange = () => { dfMapMonth = $('dfMapMonthSel').value; dfRenderMap(); };
+$('btnDfCreate').onclick = () => dfCreateFolders('main');
+$('btnDfCreateCC').onclick = () => dfCreateFolders('cc');
+dfRender();
+dfRestore();
 
 /* ================= disposal ================= */
 const DSP_REQUIRED = {HP:['serial','asset','part','warranty'], LENOVO:['serial','asset','part'], APPLE:['serial','asset']};
@@ -3351,7 +3737,9 @@ function cmdbIngest(objs, name){
                  warranty: pick(cW, prev.warranty), substate: pick(cSub, prev.substate), state: pick(cSt, prev.state)};
     n++;
   }
-  state.cmdb = {rows, name, at:new Date().toISOString(), count:Object.keys(rows).length};
+  const names = ((state.cmdb && (state.cmdb.names || [state.cmdb.name])) || []).filter(x => x && x !== name);
+  names.push(name);
+  state.cmdb = {rows, name, names: names.slice(-4), at:new Date().toISOString(), count:Object.keys(rows).length};
   return n;
 }
 function dspIndex(){
@@ -3429,10 +3817,8 @@ function renderDisposal(){
 
   const rows = dspRows(month, bsel.value);
   const cmdb = state.cmdb;
-  $('dspCmdbInfo').innerHTML = cmdb
-    ? 'ServiceNow data: <b>'+esc(cmdb.name||'')+'</b> · '+cmdb.count+' record(s) · loaded '+new Date(cmdb.at).toLocaleString()
-    : '<span style="color:var(--warn)">No ServiceNow data loaded yet: load the export in Reconcile (or auto-load the month) to fill model, CMDB warranty and status.</span>';
   const attn = rows.filter(r => r.flags.length).length;
+  dspRenderSteps(month, boxes, rows, attn, meta);
   const inW = rows.filter(r => r.inWarranty === 'Yes').length;
   const models = new Set(rows.map(r => r.model || '(unknown)')).size;
   const stat = (n,l,cls) => '<div class="stat '+(cls||'')+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';
@@ -3461,21 +3847,143 @@ function renderDisposal(){
   document.querySelectorAll('#dspTableWrap tr[data-dspbox]').forEach(tr => tr.onclick = () => openDrawer(tr.dataset.dspbox, month));
 }
 
+/* ---- the 4 guided steps: status of each one, in plain words ---- */
+let dspLoadNote = null;   // {html, warn} result of the last "load" action, shown under step 1
+const cmdbNames = () => state.cmdb ? ((state.cmdb.names && state.cmdb.names.length) ? state.cmdb.names : [state.cmdb.name]).filter(Boolean).join(' + ') : '';
+function dspRenderSteps(month, boxes, rows, attn, meta){
+  const chip = t => '<span class="pathchip">'+esc(t)+'</span>';
+  const root = dfRootName(), home = root+' › Disposal › '+month;
+  const setStep = (n, cls) => { $('dspStep'+n).className = 'step'+(cls ? ' '+cls : ''); };
+  $('dspHomePath').textContent = home;
+  const cmdb = state.cmdb, dfm = state.disposalFileMeta;
+  const devN = $('dspBoxSel').value ? dspRows(month, '').length : rows.length;   // step 1 always speaks for the whole month
+
+  // 1 scanner files
+  setStep(1, devN ? 'done' : '');
+  $('dspS1').innerHTML = boxes.length
+    ? '<b>'+boxes.length+'</b> disposal box'+(boxes.length>1?'es':'')+', <b>'+devN+'</b> device'+(devN===1?'':'s')+' in '+month
+    : 'No disposal boxes in '+month+' yet.';
+  $('dspS1help').innerHTML = 'On the iPhone: start the box with <b>Disposal box</b> ticked, scan, <b>Close box</b>, <b>Export CSV</b>, <b>Save to Files</b> in '+chip(home)+'. Then click the button below'+
+    (dfReady() ? '.' : (ccDirHandle ? ' (first click <b>Grant access</b> in the bar at the top).' : ' (first connect the Data folder in the bar at the top), or choose the CSV files by hand.'));
+  $('btnDspLoadFolder').textContent = 'Load '+month+' from the Data folder';
+  const lr = $('dspLoadResult');
+  lr.style.display = dspLoadNote ? 'block' : 'none';
+  lr.className = 'stepresult'+(dspLoadNote && dspLoadNote.warn ? ' warn' : '');
+  lr.innerHTML = dspLoadNote ? dspLoadNote.html : '';
+
+  // 2 ServiceNow data
+  setStep(2, cmdb ? 'done' : '');
+  $('dspS2').innerHTML =
+    (cmdb ? 'ServiceNow data: <b>'+esc(cmdbNames())+'</b> · '+cmdb.count+' record(s) · loaded '+new Date(cmdb.at).toLocaleString()
+          : '<span style="color:var(--warn)">No ServiceNow data yet: model, CMDB warranty and SNOW status stay empty until it is loaded.</span>')+
+    '<br>"Pending disposal" export: '+(dfm ? '<b>'+esc(dfm.name)+'</b> · '+dfm.rows+' record(s)' : 'not loaded (optional: it catches assets that are absent from the main export)');
+  $('dspS2help').innerHTML = 'Step 1 loads both automatically when the files are in place: the main export (e.g. alm_hardware.xlsx) in '+chip(root+' › ServiceNow › '+month)+' and the "Pending disposal" export in '+chip(home)+'. Or choose them by hand:';
+
+  // 3 review
+  const only = $('dspOnlyFlags').checked;
+  setStep(3, !rows.length ? '' : (attn ? 'attn' : (cmdb ? 'done' : '')));
+  $('dspS3').innerHTML = !rows.length ? 'Nothing to review yet.'
+    : (attn ? '<b>'+attn+'</b> of '+rows.length+' device(s) need attention: see the Flags column below.' : 'All '+rows.length+' device(s) are clean.')+
+      (cmdb ? '' : ' ServiceNow checks are skipped until step 2 is done.');
+  $('btnDspShowFlags').textContent = only ? 'Show all rows' : 'Show only rows that need attention';
+  $('btnDspShowFlags').style.display = (attn || only) ? '' : 'none';
+
+  // 4 export
+  const ls = meta.lastSaved;
+  setStep(4, ls ? 'done' : '');
+  $('dspS4').innerHTML =
+    (ccDirHandle ? 'Saves into '+chip(home+' › Reports')+(dfPerm === 'readwrite' ? '.' : '. Chrome asks once for permission to save ("Save changes").')
+                 : 'Saves to the <b>Downloads</b> folder of this computer. Connect the Data folder (bar at the top) to save straight into '+chip(home+' › Reports')+'.')+
+    (ls ? '<br>Last saved: <b>'+esc(ls.name)+'</b> in '+chip(ls.where)+' · '+new Date(ls.at).toLocaleString() : '');
+}
+function dspLoadNoteFromFolder(res){
+  if (!res) return null;
+  const m = res.month, root = dfRootName(), li = [];
+  const p = res.phone;
+  li.push('<b>Scanner files</b>: '+(res.pcImported
+    ? res.pcImported+' file(s) read ('+res.fromDisposal+' in Disposal/'+m+', '+res.fromCount+' in PhysicalCount/'+m+')'+(p ? ': '+p.added+' device(s), '+p.disposalInFiles+' disposal box(es)'+(p.boxesSkippedOlder ? ', '+p.boxesSkippedOlder+' older re-count(s) skipped' : '') : '')
+    : 'none found. '+esc(root)+' › Disposal › '+m+': '+impFolderWhy(res.dp, 'Disposal', m, 'none is a scanner CSV')));
+  li.push('<b>ServiceNow export</b>: '+(res.snLoaded ? esc(res.snName)+' loaded' : impFolderWhy(res.sn, 'ServiceNow', m, 'no serial column')));
+  li.push('<b>"Pending disposal" export</b>: '+(res.dpRows ? esc(res.dpName)+', '+res.dpRows+' record(s)' : 'not found in Disposal/'+m+' (optional)'));
+  if (res.errors.length) li.push('<span style="color:var(--err)"><b>Could not read</b>: '+res.errors.map(esc).join('; ')+'</span>');
+  return {html:'<ul>'+li.map(x => '<li>'+x+'</li>').join('')+'</ul>', warn: !res.pcImported || !!res.errors.length};
+}
+$('btnDspLoadFolder').onclick = async () => {
+  const res = await impAutoload($('dspMonthSel').value || state.current);
+  if (res){ dspLoadNote = dspLoadNoteFromFolder(res); renderDisposal(); }
+};
+$('btnDspPickCsv').onclick = () => $('fileDspCsv').click();
+$('fileDspCsv').onchange = async () => {
+  const fi = $('fileDspCsv'), files = [...fi.files]; fi.value = '';
+  if (!files.length) return;
+  const month = $('dspMonthSel').value || state.current;
+  const r = await importPhoneFiles(files, month), p = r.phone;
+  dspLoadNote = {warn: !r.used || !!r.skipped.length || !!(p && !p.disposalInFiles),
+    html: '<ul><li><b>Scanner files</b>: '+r.used+' of '+files.length+' file(s) imported into '+month+(p ? ': '+p.added+' device(s), '+p.disposalInFiles+' disposal box(es)' : '')+'</li>'+
+      (p && !p.disposalInFiles ? '<li>None of these boxes was scanned as a disposal box. To treat one as disposal, open it in the Boxes tab and set "Disposal box: on".</li>' : '')+
+      (r.skipped.length ? '<li>Skipped: '+r.skipped.map(esc).join('; ')+'</li>' : '')+'</ul>'};
+  renderDisposal();
+};
+$('btnDspPickSn').onclick = () => $('fileDspSn').click();
+$('fileDspSn').onchange = () => {
+  const f = $('fileDspSn').files[0]; $('fileDspSn').value = ''; if (!f) return;
+  readAny(f, (objs, name) => {
+    if (!objs.length) return toast('File has no data rows', true);
+    const head = Object.keys(objs[0]);
+    if (!findCol(head, ['serial.?number','serial.?num','^serial$','^sn$','serial']) && !findCol(head, ['asset.?tag','^asset$','^tag$']))
+      return toast('No serial or asset tag column in '+name+': is this the ServiceNow export?', true, 5000);
+    impLoadSnow(objs, name); save(); renderDisposal();
+    toast(objs.length+' ServiceNow row(s) loaded from '+name);
+  });
+};
+$('btnDspPickDp').onclick = () => $('fileDspDp').click();
+$('fileDspDp').onchange = () => {
+  const f = $('fileDspDp').files[0]; $('fileDspDp').value = ''; if (!f) return;
+  readAny(f, (objs, name) => {
+    const n = loadDisposalRecords(objs, name);
+    if (typeof snObjs!=='undefined' && snObjs) runReconciliation();
+    renderDisposal();
+    toast(n ? (n+' pending disposal record(s) loaded from '+name) : 'No pending disposal rows found in '+name, !n);
+  });
+};
+$('btnDspShowFlags').onclick = () => {
+  $('dspOnlyFlags').checked = !$('dspOnlyFlags').checked; renderDisposal();
+  try{ $('dspTableWrap').scrollIntoView({behavior:'smooth', block:'start'}); }catch(e){}
+};
+// report goes into Data/Disposal/YYYY-MM/Reports when the folder can be written, else to Downloads; either way the page says where
+async function dspDeliver(blob, name, month, canSave){
+  let where = '', err = '';
+  if (canSave){
+    try{ await dfSaveFile(['Disposal', month, 'Reports'], name, blob); where = [dfRootName(), 'Disposal', month, 'Reports'].join(' › '); }
+    catch(e){ err = e.message || String(e); }
+  }
+  if (!where){ downloadBlob(blob, name, true); where = 'Downloads'; }
+  dspMetaOf(month).lastSaved = {name, where, at:new Date().toISOString()};
+  save(); renderDisposal();
+  toast(err ? 'Could not write into the Data folder (is the file open in Excel?). Saved to Downloads instead: '+name
+            : 'Saved in '+where+': '+name, !!err, 5500);
+}
+
 const DSP_COLS = ['Box','Brand','Serial number','Asset tag','Part number','Model','Warranty (label)','Warranty (CMDB)','Under warranty','ServiceNow status','Asset tag (CMDB)','Flags','Scanned at','Scanned by'];
 const dspRowVals = r => [r.box, DSP_BRAND[r.brand]||r.brand, r.serial, r.asset, r.part, r.model, r.warrantyLabel, r.warrantyCmdb, r.inWarranty,
   r.snow, r.assetCmdb, r.flags.map(f => f.t).join('; '), r.at ? new Date(r.at).toLocaleString() : '', r.by];
 function dspSel(){ return {month: $('dspMonthSel').value || state.current, box: $('dspBoxSel').value}; }
-function dspFileBase(){ const {month, box} = dspSel(); return 'disposal-'+month+(box ? '-'+box.replace(/[\\/:*?"<>|]+/g,'-') : ''); }
+function dspFileBase(){ const {month, box} = dspSel(); return 'disposal-report-'+month+(box ? '-'+box.replace(/[\\/:*?"<>|]+/g,'-') : ''); }   // "report": never the same name as a scanner CSV
 
-$('btnDspCsv').onclick = () => {
+$('btnDspCsv').onclick = async () => {
   const {month, box} = dspSel(); const rows = dspRows(month, box);
   if (!rows.length) return toast('No disposal devices to export', true);
-  downloadFile([DSP_COLS].concat(rows.map(dspRowVals)).map(r => r.map(csvEscape).join(',')).join('\r\n'), dspFileBase()+'.csv', 'text/csv');
+  const name = dspFileBase()+'.csv';
+  const canSave = await dfTryWrite();           // asked first, while the click still counts as a user gesture
+  const csv = [DSP_COLS].concat(rows.map(dspRowVals)).map(r => r.map(csvEscape).join(',')).join('\r\n');
+  await dspDeliver(new Blob([csv], {type:'text/csv'}), name, month, canSave);
 };
 $('btnDspExcel').onclick = async () => {
   if (typeof ExcelJS === 'undefined') return toast('Excel library not loaded: check your connection', true);
   const {month, box} = dspSel(); const rows = dspRows(month, box);
   if (!rows.length) return toast('No disposal devices to export', true);
+  const name = dspFileBase()+'.xlsx';
+  const canSave = await dfTryWrite();           // asked first, while the click still counts as a user gesture
   try{
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Disposal '+month);
@@ -3485,7 +3993,7 @@ $('btnDspExcel').onclick = async () => {
     const inW = rows.filter(r => r.inWarranty === 'Yes').length, attn = rows.filter(r => r.flags.length).length;
     const boxes = [...new Set(rows.map(r => r.box))];
     [['Devices', rows.length], ['Boxes', boxes.join(', ')], ['Still under warranty', inW], ['Need attention', attn],
-     ['ServiceNow data', state.cmdb ? (state.cmdb.name+' ('+new Date(state.cmdb.at).toLocaleDateString()+')') : 'not loaded']]
+     ['ServiceNow data', state.cmdb ? (cmdbNames()+' ('+new Date(state.cmdb.at).toLocaleDateString()+')') : 'not loaded']]
       .forEach(([l,v], i) => { ws.getCell('A'+(3+i)).value = l; ws.getCell('B'+(3+i)).value = v;
         ws.getCell('A'+(3+i)).font = {color:{argb:'FF5A6A8A'}}; ws.getCell('B'+(3+i)).font = {bold:true}; });
     const hIdx = 9; const hr = ws.getRow(hIdx); hr.values = DSP_COLS;
@@ -3507,8 +4015,7 @@ $('btnDspExcel').onclick = async () => {
     ws2.columns = [{width:30},{width:12},{width:16}];
 
     const buf = await wb.xlsx.writeBuffer();
-    downloadBlob(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), dspFileBase()+'.xlsx');
-    toast('Disposal report exported');
+    await dspDeliver(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), name, month, canSave);
   }catch(e){ toast('Excel export failed: '+e.message, true); }
 };
 
@@ -3546,7 +4053,7 @@ $('btnDspPrint').onclick = () => {
   setTimeout(() => { window.print(); document.body.classList.remove('print-disposal'); }, 200);
 };
 
-$('dspMonthSel').onchange = renderDisposal;
+$('dspMonthSel').onchange = () => { dspLoadNote = null; renderDisposal(); };
 $('dspBoxSel').onchange = renderDisposal;
 $('dspOnlyFlags').onchange = renderDisposal;
 [['dspVendor','vendor'],['dspRef','ref'],['dspSite','site']].forEach(([id,k]) => $(id).addEventListener('input', () => {
@@ -3578,7 +4085,8 @@ $('btnWipe').onclick = () => {
   if (String(typed).trim().toUpperCase() !== 'DELETE'){ toast('Not erased — you must type DELETE', true); return; }
   localStorage.removeItem(KEY);
   try{ indexedDB.deleteDatabase(CC_DB); }catch(e){}   // drop the connected-folder handle
-  ccDirHandle = null;
+  try{ localStorage.removeItem(DF_WRITE_KEY); }catch(e){}
+  ccDirHandle = null; dfPerm = 'none'; dfNote = ''; dfMapOpen = false; dfRender();
   state = load(); viewedMonth = null;
   renderAll(); toast('All data erased — clean slate');
 };
@@ -3590,14 +4098,15 @@ function downloadFile(content, name, mime){
   a.href = URL.createObjectURL(new Blob([content],{type:mime}));
   a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
+  toast('Saved to the Downloads folder of this computer: '+name, false, 4500);
 }
-function toast(msg, warn){
+function toast(msg, warn, ms){
   const t = $('toast');
   t.textContent = msg;
   t.classList.toggle('warn', !!warn);
   t.classList.add('show');
   clearTimeout(t._h);
-  t._h = setTimeout(()=>t.classList.remove('show'), 2400);
+  t._h = setTimeout(()=>t.classList.remove('show'), ms || 2400);
 }
 
 $('btnCloseMonthView').onclick = () => { viewedMonth = null; renderMonths(); };
