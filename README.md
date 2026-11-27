@@ -19,7 +19,7 @@ The Manager is meant to be downloaded and opened locally in Chrome or Edge (its 
 
 ## Versions
 
-- Inventory Manager **v1.15.0**
+- Inventory Manager **v1.16.0**
 - Label Scanner **v1.3.1**
 
 Each file carries its own changelog in the comment at the top of the source.

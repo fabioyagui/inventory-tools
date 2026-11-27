@@ -2,13 +2,24 @@
 <!--
 ==================================================================================
   INVENTORY MANAGER — APAC platform (boxes, assets, reconciliation, chargeback)
-  APP VERSION: 1.15.0
+  APP VERSION: 1.16.0
   Keep this changelog in sync: on every change, bump APP_VERSION (in the script
   below) to match the newest entry here, and add a line describing what changed.
   Versioning: MAJOR.MINOR.PATCH — PATCH = fixes, MINOR = new features, MAJOR = big
   architectural shifts.
   ----------------------------------------------------------------------------------
   CHANGELOG
+  v1.16.0 (2026-11-27) - New look, same functions. A sidebar replaces the row of ten tabs and
+                        groups the sections by job: Monthly count (Months, Boxes, Assets,
+                        Import, Reconcile), Disposal, Planning (Restock, Headcount, Cost
+                        Center) and System (Backup). Each page opens with its name and one
+                        line on what it is for. The Data folder state is always visible at
+                        the foot of the sidebar; one click there grants access again or opens
+                        the folder map. Neutral surfaces with orange as the single accent,
+                        system fonts (no web font download), plain icons instead of emoji,
+                        no gradient title and no coloured side stripes on cards. The sidebar
+                        folds into a top bar on narrow windows. Printing (QR labels and the
+                        handover sheet) is unchanged. No data or file format change.
   v1.15.0 (2026-11-25) - Files and folders made explicit, disposal first. ONE "Data folder" bar
                         at the top of every tab replaces the two Connect buttons: it shows the
                         state (not connected / access paused / connected, read only or can
@@ -143,34 +154,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inventory Manager — Monthly Boxes, Assets & Reconciliation</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap">
+<title>Inventory Manager</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
   :root{
-    --bg:#f0f3f8; --card:#FFFFFF; --surface2:#e8eef5;
-    --ink:#12213a; --muted:#5a6a8a;
-    --line:rgba(0,48,135,0.12); --line2:rgba(0,48,135,0.22); --border:var(--line);
-    --blue:#003087; --mid:#0070C0; --orange:#F26522;
-    --accent:#003087; --accent-bg:#e8eef5;
-    --ok:#16a34a; --ok-bg:#e7f6ec;
-    --warn:#c2570f; --warn-bg:#fdeee2;
-    --err:#c0392b; --err-bg:#faeceb;
-    --mono:'DM Mono',ui-monospace,'SF Mono',Consolas,monospace;
-    --shadow:0 4px 20px rgba(18,33,58,.05);
+    --bg:#F2F4F6; --card:#FFFFFF; --surface2:#E9EDF1;
+    --ink:#111A24; --muted:#4C5A69;
+    --line:#D8DEE5; --line2:#B9C3CE; --border:var(--line);
+    --blue:#111A24; --mid:#3B5B7A; --orange:#F26522;
+    --accent:#111A24; --accent-bg:#EEF1F4;
+    --ok:#11643C; --ok-bg:#E4F3EA;
+    --warn:#8A4B00; --warn-bg:#FFF4DC;
+    --err:#A8200D; --err-bg:#FBEAE7;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --shadow:none;
+    --side:#0B1118; --side-ink:#E8EEF4; --side-muted:#A9B8C8;
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  body{background:var(--bg);color:var(--ink);font-family:'DM Sans','Segoe UI',system-ui,sans-serif;font-size:15px;line-height:1.5}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5}
   .wrap{max-width:1120px;margin:0 auto;padding:20px}
 
-  header.app{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
-  header.app h1{font-size:26px;font-weight:700;letter-spacing:-0.03em;background:linear-gradient(135deg,var(--blue) 30%,var(--orange));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  header.app .sub{color:var(--muted);font-size:13px}
   .tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4px;flex-wrap:wrap;box-shadow:var(--shadow)}
   .tabs button{border:0;background:transparent;padding:9px 16px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:7px}
   .tabs button.active{background:var(--blue);color:#fff}
@@ -357,18 +363,18 @@
   .dspwrap td:last-child{background:var(--card);box-shadow:-10px 0 10px -10px rgba(18,33,58,.25);white-space:normal;min-width:170px}
   .dspwrap tr.clickable:hover td:last-child{background:var(--accent-bg)}
   @media print{
-    body > .wrap, .drawer, .overlay, .toast{display:none !important}
+    body > .shell, .drawer, .overlay, .toast{display:none !important}
     #printArea{display:block}
     body.print-disposal #printArea{display:none !important}
     body.print-disposal #printDisposal{display:block}
-    .hov{font-family:'DM Sans',Arial,sans-serif;color:#000;font-size:9.5pt;padding:2mm}
+    .hov{font-family:Arial,Helvetica,sans-serif;color:#000;font-size:9.5pt;padding:2mm}
     .hov h1{font-size:16pt;margin-bottom:3mm}
     .hov h2{font-size:11pt;margin:5mm 0 2mm}
     .hov table{width:100%;border-collapse:collapse;margin-bottom:2mm}
     .hov th,.hov td{border:1px solid #888;padding:1.2mm 2mm;font-size:8.5pt;text-align:left;vertical-align:top}
     .hov th{background:#e9e9e9 !important;color:#000 !important;border-radius:0 !important;font-family:inherit;letter-spacing:0;text-transform:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .hov tr{page-break-inside:avoid}
-    .hov .mono{font-family:'DM Mono',Consolas,monospace}
+    .hov .mono{font-family:Consolas,Menlo,monospace}
     .hov .meta td:nth-child(odd){width:18%;color:#444}
     .hov .sigs{display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-top:8mm;page-break-inside:avoid}
     .hov .sig{border:1px solid #888;padding:3mm}
@@ -384,28 +390,81 @@
     .plabel.locv .pid{background:#000;color:#fff;padding:1.5mm 2mm;border-radius:2mm}
     .plabel.locv .ploc{font-weight:700;letter-spacing:.12em;color:#000}
   }
+
+  /* ===== v1.16.0: sidebar by job, neutral surfaces, orange as the single accent ===== */
+  .shell{display:flex;min-height:100vh;align-items:stretch}
+  .side{flex:none;width:232px;background:var(--side);color:var(--side-ink);padding:18px 12px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .brand{font-weight:700;font-size:16px;padding:2px 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ver{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--side-muted);border:1px solid #2A3745;border-radius:6px;padding:1px 6px}
+  .side .tabs{display:flex;flex-direction:column;gap:2px;background:none;border:0;border-radius:0;padding:0;box-shadow:none;flex-wrap:nowrap}
+  .navgrp{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--side-muted);padding:14px 10px 4px}
+  .navgrp:first-child{padding-top:0}
+  .side .tabs button{text-align:left;padding:9px 10px;border-radius:8px;font-size:14px;font-weight:500;color:#C3CFDB;background:transparent}
+  .side .tabs button:hover{background:#18222D;color:#fff}
+  .side .tabs button.active{background:var(--orange);color:#1A0D00;font-weight:700}
+  .side button:focus-visible{outline:2px solid #fff;outline-offset:1px}
+  .sidefolder{margin-top:auto;display:flex;align-items:center;gap:10px;text-align:left;border:1px solid #2A3745;background:#121A23;color:var(--side-ink);border-radius:10px;padding:10px 12px;cursor:pointer;font:inherit}
+  .sidefolder:hover{background:#18222D}
+  .sidefolder .dot{flex:none;width:9px;height:9px;border-radius:50%;background:#7F8FA1}
+  .sidefolder.ok .dot{background:#3DDC97}
+  .sidefolder.warn .dot{background:#FFB020}
+  .sidefolder b{display:block;font-size:13px;font-weight:600;word-break:break-word}
+  .sidefolder small{display:block;font-size:12px;color:var(--side-muted)}
+  .wrap{flex:1;min-width:0;max-width:1200px;margin:0;padding:24px 28px 48px}
+  .pagehead{margin-bottom:16px}
+  .pagehead h1{font-size:26px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
+  .pagehead .sub{color:var(--muted);font-size:14px}
+  .card{border-radius:12px}
+  .stat{border-left:1px solid var(--border)}
+  .stat.warnstat,.stat.errstat,.stat.okstat{border-left-color:var(--border)}
+  th{background:var(--ink)}
+  .pill.info{background:var(--surface2);color:var(--ink)}
+  .ccdepthead{background:var(--accent-bg)}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--orange);border-color:var(--orange)}
+  .btn:focus-visible,.linkbtn:focus-visible,.subtab:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+  .dfbar{border-left:1px solid var(--border)}
+  .dfbar.ok,.dfbar.warn{border-left-color:var(--border)}
+  .dftitle::before{content:'';display:inline-block;width:9px;height:9px;border-radius:50%;background:#8794A2;margin-right:8px}
+  .dfbar.ok .dftitle::before{background:var(--ok)}
+  .dfbar.warn .dftitle::before{background:#D98200}
+  .dfbar.flash{box-shadow:0 0 0 3px var(--orange)}
+  .folder .ficon{color:var(--muted);line-height:0}
+  .folder.activefolder{border:2px solid var(--orange)}
+  .recsum-row.active{outline:1px solid var(--orange)}
+  @media (max-width:900px){
+    .shell{flex-direction:column}
+    .side{width:auto;height:auto;position:static;gap:10px;padding:12px}
+    .side .tabs{flex-direction:row;flex-wrap:wrap}
+    .navgrp{display:none}
+    .sidefolder{margin-top:0}
+    .wrap{padding:16px}
+  }
 </style>
 </head>
 <body>
+<div class="shell">
+<aside class="side">
+  <div class="brand">Inventory Manager <span id="appVersion" class="ver">v1.16.0</span></div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <div class="navgrp">Monthly count</div>
+    <button class="active" data-tab="months">Months</button>
+    <button data-tab="boxes">Boxes</button>
+    <button data-tab="assets">Assets</button>
+    <button data-tab="import">Import</button>
+    <button data-tab="reconcile">Reconcile</button>
+    <div class="navgrp">Disposal</div>
+    <button data-tab="disposal">Disposal</button>
+    <div class="navgrp">Planning</div>
+    <button data-tab="restock">Restock</button>
+    <button data-tab="headcount">Headcount</button>
+    <button data-tab="costcenter">Cost Center</button>
+    <div class="navgrp">System</div>
+    <button data-tab="backup">Backup</button>
+  </nav>
+  <button class="sidefolder" id="sideFolder"><span class="dot"></span><span><b id="sideFolderT">Data folder</b><small id="sideFolderS">not connected</small></span></button>
+</aside>
 <div class="wrap">
-  <header class="app">
-    <div>
-      <h1>Inventory Manager <span id="appVersion" class="pill" style="font-size:12px;vertical-align:middle;background:var(--accent);color:#fff;-webkit-text-fill-color:#fff;-webkit-background-clip:border-box;background-clip:border-box">v1.15.0</span></h1>
-      <div class="sub">Monthly counts · Boxes · ServiceNow reconciliation — data lives in this browser</div>
-    </div>
-    <div class="tabs" role="tablist">
-      <button class="active" data-tab="months">Months</button>
-      <button data-tab="boxes">Boxes</button>
-      <button data-tab="assets">Assets</button>
-      <button data-tab="import">Import</button>
-      <button data-tab="reconcile">Reconcile</button>
-      <button data-tab="disposal">Disposal</button>
-      <button data-tab="restock">Restock</button>
-      <button data-tab="headcount">Headcount</button>
-      <button data-tab="costcenter">Cost Center</button>
-      <button data-tab="backup">Backup</button>
-    </div>
-  </header>
+  <div class="pagehead"><h1 id="pageTitle">Months</h1><div class="sub" id="pageSub"></div></div>
 
   <!-- ================= DATA FOLDER (one connection, every tab) ================= -->
   <div class="dfbar" id="dfBar">
@@ -468,8 +527,8 @@
       <div class="subhead" style="display:flex;justify-content:space-between;align-items:center">
         <span id="monthViewTitle">Boxes</span>
         <div class="row">
-          <button class="linkbtn" id="btnDeleteMonth" style="color:var(--err)">🗑 Delete this month</button>
-          <button class="linkbtn" id="btnCloseMonthView">✕ close</button>
+          <button class="linkbtn" id="btnDeleteMonth" style="color:var(--err)">Delete this month</button>
+          <button class="linkbtn" id="btnCloseMonthView">Close</button>
         </div>
       </div>
       <div class="boxgrid" id="monthBoxGrid"></div>
@@ -542,7 +601,7 @@
         <div class="row">
           <label class="f">Month</label>
           <select id="impMonthSel"></select>
-          <button class="btn" id="btnImpAutoload">⚡ Auto-load month</button>
+          <button class="btn" id="btnImpAutoload">Auto-load month</button>
         </div>
       </div>
       <div class="summary" id="impLoadSummary"></div>
@@ -800,7 +859,7 @@
           <select id="ccCountrySel" style="width:150px"></select>
           <label class="f">Month</label>
           <select id="ccMonthSel"><option value="">—</option></select>
-          <button class="btn" id="btnCCAutoload">⚡ Auto-load month</button>
+          <button class="btn" id="btnCCAutoload">Auto-load month</button>
         </div>
       </div>
       <div id="ccManualFallback" style="display:none;margin-top:12px">
@@ -865,6 +924,7 @@
       </div>
     </div>
   </div>
+</div>
 </div>
 
 <!-- box detail drawer -->
@@ -936,7 +996,7 @@
 <div id="printDisposal"></div>
 <script>
 /* ================= state v2 ================= */
-const APP_VERSION = '1.15.0';   // keep in sync with the CHANGELOG comment at the top of this file
+const APP_VERSION = '1.16.0';   // keep in sync with the CHANGELOG comment at the top of this file
 const KEY = 'inv-manager-v1';
 (function(){ try{ const el=document.getElementById('appVersion'); if(el) el.textContent='v'+APP_VERSION; }catch(e){} })();
 let state = load();
@@ -1010,11 +1070,30 @@ function diffCounts(cur, prev){
 }
 
 /* ================= tabs ================= */
+const PAGE_HEAD = {
+  months:     ['Months', 'Monthly snapshots: what was counted, what changed and what is missing.'],
+  boxes:      ['Boxes', 'Create boxes, print their QR labels, open a box to see or edit its contents.'],
+  assets:     ['Assets', 'Find a device in the current month by serial, asset tag, box or location.'],
+  import:     ['Import', 'Bring in the scanner files and the ServiceNow exports.'],
+  reconcile:  ['Reconcile', 'Compare the count with ServiceNow and work through the differences.'],
+  disposal:   ['Disposal', 'Devices leaving stock: check each one against ServiceNow and export the report.'],
+  restock:    ['Restock', 'What to buy this month, by model, from the safety stock and the count.'],
+  headcount:  ['Headcount', 'Joiners and leavers from the ServiceNow catalog export.'],
+  costcenter: ['Cost Center', 'Which cost center reimburses each delivered PC.'],
+  backup:     ['Backup', 'Export or restore everything this page keeps in the browser.']
+};
+function setPageHead(tab){
+  const h = PAGE_HEAD[tab] || [tab, ''];
+  $('pageTitle').textContent = h[0]; $('pageSub').textContent = h[1];
+  document.title = h[0] + ' · Inventory Manager';
+}
+setPageHead('months');
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');
   $('panel-'+b.dataset.tab).classList.add('active');
+  setPageHead(b.dataset.tab);
   if (b.dataset.tab === 'assets') setTimeout(()=>$('assetSearch').focus(), 50);
   if (b.dataset.tab === 'disposal') renderDisposal();
 });
@@ -1076,7 +1155,7 @@ function renderMonths(){
     const it = Object.values(m.counts).reduce((n,c)=>n+c.serials.length,0);
     return '<div class="folder'+(l===viewedMonth?' activefolder':'')+'" data-month="'+l+'">'+
       '<div class="fbadge">'+(l===state.current?'<span class="pill info">current</span>':(m.closedAt?'<span class="pill gray">closed</span>':''))+'</div>'+
-      '<div class="ficon">📁</div><div class="flabel">'+l+'</div>'+
+      '<div class="ficon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div><div class="flabel">'+l+'</div>'+
       '<div class="fmeta">'+bx+' box(es) · '+it+' asset(s)</div></div>';
   }).join('');
   document.querySelectorAll('[data-month]').forEach(f => f.onclick = () => {
@@ -1106,7 +1185,7 @@ function renderMonths(){
         : '<span class="pill ok">unchanged</span>';
     }
     cards += '<div class="bcard" data-openbox="'+id+'" data-openmonth="'+vLabel+'">'+
-      '<div class="bid">'+id+(b&&b.photo?' 📷':'')+(b&&b.disposal?' <span class="pill err" style="font-size:10.5px">disposal</span>':'')+'</div>'+
+      '<div class="bid">'+id+(b&&b.photo?' <span class="pill gray" style="font-size:10.5px">photo</span>':'')+(b&&b.disposal?' <span class="pill err" style="font-size:10.5px">disposal</span>':'')+'</div>'+
       '<div class="bloc">'+((b&&b.location)||'—')+(b?'':' <span class="pill err">deleted</span>')+'</div>'+
       '<div class="brow"><div class="bnum">'+c.serials.length+' <small>PCs</small></div>'+badge+'</div></div>';
   }
@@ -1145,7 +1224,7 @@ function mkChart(id, cfg){
   if (charts[id]) charts[id].destroy();
   charts[id] = new Chart($(id), cfg);
 }
-const AX = {ticks:{color:'#5a6a8a',font:{size:11,family:'DM Sans'}},grid:{color:'rgba(0,48,135,0.06)'},border:{color:'rgba(0,48,135,0.15)'}};
+const AX = {ticks:{color:'#5a6a8a',font:{size:11,family:'Segoe UI, system-ui, sans-serif'}},grid:{color:'rgba(0,48,135,0.06)'},border:{color:'rgba(0,48,135,0.15)'}};
 function renderMonthCharts(vLabel, vCounts){
   if (typeof Chart === 'undefined') return;
   const labels = monthLabels();
@@ -1153,7 +1232,7 @@ function renderMonthCharts(vLabel, vCounts){
     type:'bar',
     data:{labels, datasets:[{
       data: labels.map(l => Object.values(countsOf(l)).reduce((n,c)=>n+c.serials.length,0)),
-      backgroundColor: labels.map(l => l===state.current ? '#F26522' : '#003087'),
+      backgroundColor: labels.map(l => l===state.current ? '#F26522' : '#2B3A4A'),
       borderRadius:6, maxBarThickness:46
     }]},
     options:{responsive:true, maintainAspectRatio:false,
@@ -1166,12 +1245,12 @@ function renderMonthCharts(vLabel, vCounts){
     type:'bar',
     data:{labels:ids, datasets:[{
       data: ids.map(id => vCounts[id].serials.length),
-      backgroundColor: ids.map(id => vCounts[id].carriedOver ? '#0070C0' : '#003087'),
+      backgroundColor: ids.map(id => vCounts[id].carriedOver ? '#7C8B9A' : '#2B3A4A'),
       borderRadius:6, maxBarThickness:30
     }]},
     options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
       plugins:{legend:{display:false}},
-      scales:{x:{...AX, ticks:{...AX.ticks, precision:0}}, y:{...AX, grid:{display:false}, ticks:{...AX.ticks, font:{size:11,family:'DM Mono'}}}},
+      scales:{x:{...AX, ticks:{...AX.ticks, precision:0}}, y:{...AX, grid:{display:false}, ticks:{...AX.ticks, font:{size:11,family:'Consolas, Menlo, monospace'}}}},
       onClick:(e,els)=>{ if(els.length) openDrawer(ids[els[0].index], vLabel); }}
   });
 }
@@ -1305,7 +1384,7 @@ function renderBoxes(){
       ' <button class="btn small danger" data-delrow="'+b.id+'" title="Delete box">✕</button>';
     h += '<tr class="clickable" data-box="'+b.id+'">'+
       '<td><input type="checkbox" data-sel="'+b.id+'" '+(selected.has(b.id)?'checked':'')+'></td>'+
-      '<td class="mono"><b>'+b.id+'</b>'+(b.photo?' 📷':'')+(b.disposal?' <span class="pill err">DISPOSAL</span>':'')+(b.snExempt?' <span class="pill info" title="Special storage — assigned in SNOW">SNOW-exempt</span>':'')+((b.snExemptProposed&&!b.snExempt)?' <span class="pill warn" title="Scanner proposed special storage — open the box to confirm">special?</span>':'')+'</td>'+
+      '<td class="mono"><b>'+b.id+'</b>'+(b.photo?' <span class="pill gray">photo</span>':'')+(b.disposal?' <span class="pill err">DISPOSAL</span>':'')+(b.snExempt?' <span class="pill info" title="Special storage — assigned in SNOW">SNOW-exempt</span>':'')+((b.snExemptProposed&&!b.snExempt)?' <span class="pill warn" title="Scanner proposed special storage — open the box to confirm">special?</span>':'')+'</td>'+
       '<td class="mono">'+(b.location||'—')+'</td>'+
       '<td><span class="status '+b.status+'">'+b.status+'</span></td>'+
       '<td class="mono">'+(c?c.serials.length:0)+(c&&c.carriedOver?' <span class="pill info">carried</span>':'')+'</td>'+
@@ -2243,9 +2322,9 @@ function renderRecResult(){
       type:'doughnut',
       data:{labels:['Matched','Location mismatch','Not in CMDB','Not found'].concat(exemptN?['Kept (SNOW)']:[]).concat(disposalN?['Disposal']:[]),
         datasets:[{data:[okN, misN, notCmdbN, notFoundN].concat(exemptN?[exemptN]:[]).concat(disposalN?[disposalN]:[]),
-          backgroundColor:['#16a34a','#F26522','#c0392b','#003087'].concat(exemptN?['#0070C0']:[]).concat(disposalN?['#94a3b8']:[]), borderWidth:2, borderColor:'#fff'}]},
+          backgroundColor:['#16a34a','#F26522','#c0392b','#2B3A4A'].concat(exemptN?['#7C8B9A']:[]).concat(disposalN?['#94a3b8']:[]), borderWidth:2, borderColor:'#fff'}]},
       options:{responsive:true, maintainAspectRatio:false, cutout:'62%',
-        plugins:{legend:{position:'bottom', labels:{color:'#5a6a8a', font:{size:11,family:'DM Sans'}, boxWidth:10}}}}
+        plugins:{legend:{position:'bottom', labels:{color:'#5a6a8a', font:{size:11,family:'Segoe UI, system-ui, sans-serif'}, boxWidth:10}}}}
     });
   }
 
@@ -2263,7 +2342,7 @@ function renderRecResult(){
 
   let h = '';
   if (!disc.length && filteredOut) h = '<div class="empty">No match for the current filter — '+filteredOut+' open discrepanc'+(filteredOut===1?'y':'ies')+' hidden by it.</div>';
-  else if (!disc.length) h = '<div class="empty">No open discrepancies'+(dismissedRows.length?' — '+dismissedRows.length+' dismissed':'')+' 🎉</div>';
+  else if (!disc.length) h = '<div class="empty">No open discrepancies'+(dismissedRows.length?' — '+dismissedRows.length+' dismissed':'')+'</div>';
   else {
     h = '<table><thead><tr><th>Serial</th><th>Asset tag</th><th>Status</th><th>Box</th><th>Counted loc</th><th>Model</th><th>Last used</th><th></th></tr></thead><tbody>';
     for (const r of disc)
@@ -3497,6 +3576,16 @@ function dfRender(){
       : 'Files are read from this folder. Click <b>Allow saving</b> once (Chrome asks "Save changes?") so month folders can be created and reports saved into it.';
   }
   bar.className = 'dfbar' + (cls ? ' ' + cls : '');
+  { // the same state, always in view at the foot of the sidebar
+    const sf = $('sideFolder');
+    if (sf){
+      sf.className = 'sidefolder' + (cls ? ' ' + cls : '');
+      $('sideFolderT').textContent = ccDirHandle ? 'Data folder: ' + name : 'Data folder';
+      $('sideFolderS').textContent = !sup ? 'not available in this browser'
+        : dfReady() ? (dfPerm === 'readwrite' ? 'connected · can save' : 'connected · read only')
+        : ccDirHandle ? 'access paused: click to grant' : 'not connected: click to connect';
+    }
+  }
   $('dfTitle').textContent = title;
   $('dfHint').innerHTML = hint;
   const note = $('dfNote'); note.style.display = dfNote ? 'block' : 'none'; note.textContent = dfNote;
@@ -3676,6 +3765,12 @@ async function dfRestore(){
   if (dfReady()){ try{ await ccPopulateMonths(); }catch(e){} }
 }
 $('btnDfConnect').onclick = dfConnect;
+$('sideFolder').onclick = () => {   // one click does the next sensible thing
+  if (!ccSupported()) return dfFlash();
+  if (!ccDirHandle) return dfConnect();
+  if (dfPerm === 'prompt') return dfGrant();
+  dfMapOpen = true; dfRender(); dfFlash();
+};
 $('btnDfGrant').onclick = dfGrant;
 $('btnDfWrite').onclick = async () => { toast((await dfTryWrite()) ? 'Saving allowed: reports and folders go into ' + dfRootName() : 'Saving was not allowed', !(dfPerm === 'readwrite')); };
 $('btnDfMap').onclick = () => { dfMapOpen = !dfMapOpen; dfRender(); };
@@ -3831,7 +3926,7 @@ function renderDisposal(){
     $('dspTableWrap').innerHTML = '<div class="empty">No disposal boxes in '+month+'. Tick "Disposal box" on the phone scanner when starting the box, or open a box and set "Disposal box: on".</div>';
     return;
   }
-  if (!shown.length){ $('dspTableWrap').innerHTML = '<div class="empty">'+(rows.length ? 'No rows need attention 🎉' : 'These boxes have no devices yet.')+'</div>'; return; }
+  if (!shown.length){ $('dspTableWrap').innerHTML = '<div class="empty">'+(rows.length ? 'No rows need attention' : 'These boxes have no devices yet.')+'</div>'; return; }
   let h = '<table><thead><tr><th>Box</th><th>Brand</th><th>Serial</th><th>Asset tag</th><th>Part #</th><th>Model</th><th>Warranty (label)</th><th>Warranty (CMDB)</th><th>In warranty</th><th>SNOW status</th><th>Flags</th></tr></thead><tbody>';
   for (const r of shown){
     h += '<tr class="clickable" data-dspbox="'+esc(r.box)+'">'+
