@@ -58,7 +58,9 @@ The Manager shows one Data folder bar at the top of every tab: connection state,
 
 - Same label reading, same CSV, same folders, same data on the phone: both versions see the same boxes, so going back to `scanner.html` is always possible.
 - Three screens: Home (what is pending), Scan (camera first, fields read shown on the picture, Undo last), Send (closed boxes and where each file goes).
-- Works offline once opened: the reading engine is embedded in the file and `scanner-sw.js` keeps the page available without a network. Add it to the Home Screen to use it like an app.
+- Camera and reading engine of the Tech Refresh stock check (v2.1.0): the whole picture is read in strips, so all the barcodes of a label are picked up together. A saved device shows a green screen with a check mark and its number; a device already in the box shows an orange warning.
+- Count boxes record serial, asset tag and warranty end date of each device (the part number is kept when read). Disposal boxes keep the manufacturer rules.
+- Works offline once opened: the reading engine (ZXing) is embedded in the file and `scanner-sw.js` keeps the page available without a network. Add it to the Home Screen to use it like an app.
 
 ## Notes
 
