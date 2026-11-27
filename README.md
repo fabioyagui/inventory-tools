@@ -52,6 +52,14 @@ Data/
 
 The Manager shows one Data folder bar at the top of every tab: connection state, what the browser will ask, and a folder map with what goes where. Select the folder named `Data` itself, not one of its subfolders. "Create missing folders" builds the month folders after the one-time permission to save.
 
+## Scanner v2 (trial)
+
+`scanner-v2.html` is the new interface for the Label Scanner, published next to the current one so it can be tried on real boxes before it replaces it. Open `https://fabioyagui.github.io/inventory-tools/scanner-v2.html`.
+
+- Same label reading, same CSV, same folders, same data on the phone: both versions see the same boxes, so going back to `scanner.html` is always possible.
+- Three screens: Home (what is pending), Scan (camera first, fields read shown on the picture, Undo last), Send (closed boxes and where each file goes).
+- Works offline once opened: the reading engine is embedded in the file and `scanner-sw.js` keeps the page available without a network. Add it to the Home Screen to use it like an app.
+
 ## Notes
 
 - All data stays in the browser that created it. Export a JSON backup regularly (Backup tab).
